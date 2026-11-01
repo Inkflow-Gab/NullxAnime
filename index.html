@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-accent="violet">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>NullxAnime — Anime &amp; Manga, sleek and simple</title>
+  <meta name="description" content="NullxAnime: discover anime, read manga, track your list and find where to watch legally. No captcha, no accounts, no ads.">
+  <meta name="theme-color" content="#0b0b12">
+  <meta property="og:title" content="NullxAnime">
+  <meta property="og:description" content="Anime + Manga. Sleek. No captcha. No ads. No account.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/og.png">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://graphql.anilist.co" crossorigin>
+  <link rel="preconnect" href="https://api.mangadex.org" crossorigin>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>
+    // Apply saved theme before first paint to avoid a flash.
+    try {
+      var s = JSON.parse(localStorage.getItem('nx:settings') || '{}');
+      var r = document.documentElement;
+      if (s.theme) r.dataset.theme = s.theme;
+      if (s.accent) r.dataset.accent = s.accent;
+      if (s.reduceMotion) r.classList.add('reduce-motion');
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#app">Skip to content</a>
+  <header id="topbar" class="topbar" role="banner"></header>
+  <main id="app" class="app" tabindex="-1" aria-live="polite"></main>
+  <footer id="footer" class="footer"></footer>
+  <nav id="tabbar" class="tabbar" aria-label="Primary"></nav>
+  <div id="overlay-root"></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <noscript><p style="padding:2rem;color:#fff">NullxAnime needs JavaScript to run.</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
