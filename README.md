@@ -29,6 +29,10 @@ Instead there is a small **provider layer** (`js/providers.js`). Two providers s
 
 Adding more is one `registerProvider({ id, label, resolve })` call — see [docs/PROVIDERS.md](docs/PROVIDERS.md). YouTube embeds and the Crunchyroll/Netflix launch pads have been removed; everything plays in one place.
 
+## Presenting it
+
+A 5-minute demo script, an 8-slide outline and the likely Q&A are in [docs/DEMO.md](docs/DEMO.md).
+
 ## Run locally
 
 ```bash
