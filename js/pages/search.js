@@ -8,7 +8,7 @@ import { card, fromAnime, fromManga, skelGrid, errorBox, emptyBox } from '../ui/
 import { pushSearch, getSettings } from '../store.js';
 import { go } from '../router.js';
 
-const ANIME_SORT = [['', 'Best match / popular'], ['TRENDING_DESC', 'Trending'], ['POPULARITY_DESC', 'Most popular'], ['SCORE_DESC', 'Top rated'], ['START_DATE_DESC', 'Newest'], ['FAVOURITES_DESC', 'Most favourited'], ['TITLE_ROMAJI', 'Title A–Z']];
+const ANIME_SORT = [['', 'Best match / popular'], ['TRENDING_DESC', 'Trending'], ['POPULARITY_DESC', 'Most popular'], ['SCORE_DESC', 'Top rated'], ['START_DATE_DESC', 'Newest'], ['START_DATE', 'Starting soonest'], ['FAVOURITES_DESC', 'Most favourited'], ['TITLE_ROMAJI', 'Title A–Z']];
 const FORMATS = [['', 'Any format'], ['TV', 'TV'], ['MOVIE', 'Movie'], ['OVA', 'OVA'], ['ONA', 'ONA'], ['SPECIAL', 'Special'], ['TV_SHORT', 'TV short']];
 const A_STATUS = [['', 'Any status'], ['RELEASING', 'Airing'], ['FINISHED', 'Finished'], ['NOT_YET_RELEASED', 'Upcoming'], ['HIATUS', 'Hiatus']];
 const SEASONS = [['', 'Any season'], ['WINTER', 'Winter'], ['SPRING', 'Spring'], ['SUMMER', 'Summer'], ['FALL', 'Fall']];

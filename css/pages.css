@@ -291,3 +291,14 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .swatches { display: flex; gap: 10px; } .swatch { width: 30px; height: 30px; border-radius: 50%; background: var(--c); border: 3px solid transparent; box-shadow: 0 0 0 1px var(--line-2); transition: transform .2s; } .swatch:hover { transform: scale(1.12); } .swatch.on { border-color: var(--bg); box-shadow: 0 0 0 2px var(--c); }
 .prose h2 { font-size: 20px; margin: 30px 0 10px; } .prose p, .prose li { color: var(--text-2); line-height: 1.7; } .prose ul { list-style: disc; padding-left: 22px; display: grid; gap: 8px; } .prose a { color: var(--accent); }
 .prose .lead { font-size: 18px; color: var(--text); margin-top: 12px; }
+
+/* ----- Top-10 ranking ------------------------------------------------------------------ */
+.ranking { margin-top: 28px; position: relative; z-index: 2; }
+.rank-track { grid-auto-columns: clamp(220px, 21vw, 280px) !important; gap: 4px !important; }
+.rank-item { position: relative; display: flex; align-items: flex-end; padding-left: clamp(58px, 5.4vw, 84px); min-width: 0; }
+.rank-item .card { width: 100%; }
+.rank-n { position: absolute; left: -2px; bottom: 36px; font-size: clamp(84px, 7.4vw, 112px); line-height: .8; font-weight: 900; letter-spacing: -.06em; color: transparent;
+  -webkit-text-stroke: 2.5px rgba(var(--accent-rgb), .85); text-shadow: 0 0 40px rgba(var(--accent-rgb), .35); pointer-events: none; z-index: 0; }
+.rank-item:nth-child(-n+3) .rank-n { -webkit-text-stroke-color: var(--accent-2); }
+.rank-item .card { position: relative; z-index: 1; }
+@media (max-width: 640px) { .rank-track { grid-auto-columns: 168px !important; } .rank-item { padding-left: 50px; } .rank-n { font-size: 78px; bottom: 30px; } }

@@ -69,6 +69,15 @@ export function detail(id) {
 export function anilist(body) {
   const { query, variables } = JSON.parse(body);
   if (query.includes('hero:')) return { data: { hero: { media: many(6) }, trending: { media: many(14, 2) }, airing: { media: many(14, 0).filter((m) => m.nextAiringEpisode) }, season: { media: many(12, 4) }, upcoming: { media: many(12, 7) }, top: { media: many(12, 9) }, popular: { media: many(12, 11) }, movies: { media: many(10, 6) } } };
+  if (query.includes('recent:')) {
+    const mk = (n, off, t) => many(n, off).map((m, k) => ({ airingAt: t(k), episode: 3 + k, media: m }));
+    const now = variables.now;
+    return { data: {
+      recent: { airingSchedules: mk(10, 1, (k) => now - 3600 * (k + 1)) }, soon: { airingSchedules: mk(10, 4, (k) => now + 3600 * (k + 2)) },
+      fresh: { media: many(8, 8).map((m, k) => ({ ...m, status: 'RELEASING', startDate: { year: 2026, month: 10, day: 10 + k } })) },
+      upcoming: { media: many(8, 12).map((m, k) => ({ ...m, status: 'NOT_YET_RELEASED', startDate: { year: 2027, month: 1 + (k % 3), day: 5 + k } })) },
+    } };
+  }
   if (query.includes('GenreCollection')) return { data: { GenreCollection: GENRES.concat(['Hentai']) } };
   if (query.includes('airingSchedules')) {
     const f = variables.from;

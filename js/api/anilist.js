@@ -164,3 +164,38 @@ export function mediaByIds(ids) {
     return d.Page.media;
   });
 }
+
+/* ---------- Fresh episodes, new premieres, upcoming ----------------------------------- */
+const MINI = `id type format status episodes duration season seasonYear averageScore popularity isAdult genres
+  title { romaji english native } coverImage { extraLarge large color } startDate { year month day }
+  nextAiringEpisode { episode airingAt timeUntilAiring }`;
+const ymd = (d) => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+
+/** recently aired episodes, episodes airing soon, shows that premiered lately, and upcoming shows */
+export function updatesFeed() {
+  return cached('al:updates:v1', 5 * MIN, async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const recentFrom = now - 3 * 86400, soonTo = now + 3 * 86400;
+    const freshFrom = ymd(new Date(Date.now() - 45 * 86400000)), upFrom = ymd(new Date());
+    const sched = (alias, args, sort) => `${alias}: Page(page: 1, perPage: 50) { airingSchedules(${args}, sort: ${sort}) { airingAt episode media { ${MINI} } } }`;
+    const q = `query ($recentFrom: Int, $now: Int, $soonTo: Int, $freshFrom: FuzzyDateInt, $upFrom: FuzzyDateInt) {
+      ${sched('recent', 'airingAt_greater: $recentFrom, airingAt_lesser: $now', 'TIME_DESC')}
+      ${sched('soon', 'airingAt_greater: $now, airingAt_lesser: $soonTo', 'TIME')}
+      fresh: Page(page: 1, perPage: 20) { media(type: ANIME, status: RELEASING, startDate_greater: $freshFrom, sort: START_DATE_DESC, isAdult: false, format_in: [TV, ONA, MOVIE]) { ${MINI} } }
+      upcoming: Page(page: 1, perPage: 30) { media(type: ANIME, status: NOT_YET_RELEASED, startDate_greater: $upFrom, sort: POPULARITY_DESC, isAdult: false, format_in: [TV, ONA, MOVIE]) { ${MINI} } }
+    }`;
+    const d = await gql(q, { recentFrom, now, soonTo, freshFrom, upFrom });
+    const uniq = (list) => {
+      const seen = new Set();
+      return list.filter((x) => x.media && !x.media.isAdult && ['TV', 'TV_SHORT', 'ONA', 'OVA', 'MOVIE', 'SPECIAL'].includes(x.media.format) && !seen.has(x.media.id) && seen.add(x.media.id));
+    };
+    const rank = (a, b) => (b.media.popularity || 0) - (a.media.popularity || 0);
+    const dateKey = (m) => (m.startDate?.year ? m.startDate.year * 10000 + (m.startDate.month || 12) * 100 + (m.startDate.day || 28) : 99999999);
+    return {
+      recent: uniq(d.recent.airingSchedules).sort((a, b) => b.airingAt - a.airingAt).slice(0, 24),
+      soon: uniq(d.soon.airingSchedules).sort((a, b) => a.airingAt - b.airingAt).slice(0, 24),
+      fresh: d.fresh.media,
+      upcoming: d.upcoming.media.slice().sort((a, b) => dateKey(a) - dateKey(b)).slice(0, 24),
+    };
+  });
+}

@@ -53,7 +53,8 @@ export function card(item, opts = {}) {
   if (item.score) badges.push(html`<span class="badge score">${icon('star')}${item.score}</span>`);
   if (item.type === 'manga' && item.origin && item.origin !== 'Manga') badges.push(html`<span class="badge accent">${item.origin}</span>`);
   const bl = [];
-  if (item.type === 'anime' && next && s.showCountdown) bl.push(html`<span class="badge accent">EP ${next.episode} · ${fmtCountdown(next.timeUntilAiring)}</span>`);
+  if (opts.badge) bl.push(html`<span class="badge accent">${opts.badge}</span>`);
+  else if (item.type === 'anime' && next && s.showCountdown) bl.push(html`<span class="badge accent">EP ${next.episode} · ${fmtCountdown(next.timeUntilAiring)}</span>`);
   else if (item.status === 'NOT_YET_RELEASED') bl.push(html`<span class="badge">Upcoming</span>`);
   const prog = opts.progress != null ? html`<div class="bar"><i style="width:${Math.round(opts.progress * 100)}%"></i></div>` : '';
   return html`<article class="card" data-key="${item.type}:${item.id}">

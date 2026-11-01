@@ -69,6 +69,10 @@ try {
 
   console.log('Anime');
   check('home renders hero + rails', await visit('/', '.hero-slide.active', { shot: 'home' }) && (await count('.rail .card')) > 30);
+  check('ranking: top 10 with big numerals right under the hero', (await count('#rank-track .rank-item')) === 10 && (await page.$eval('.hero + .container > .ranking', () => true).catch(() => false)));
+  check('ranking tabs switch lists', await (async () => { const a = await text('#rank-track .card .title'); await page.click('[data-rank="top"]'); await new Promise((r) => setTimeout(r, 200)); return (await count('#rank-track .rank-item')) === 10 && a.length > 0; })());
+  check('recently updated links straight to the episode', await (async () => { await page.waitForSelector('#recent .card', { timeout: 5000 }); return (await page.$eval('#recent .card .poster', (e) => e.getAttribute('href'))).startsWith('#/watch/'); })());
+  check('new releases, airing soon, upcoming-with-dates rails', (await page.$$eval('.section-head h2', (h) => h.map((x) => x.textContent))).filter((t) => ['New releases', 'Airing soon', 'Upcoming anime'].includes(t)).length === 3 && (await page.content()).includes('Premieres Jan'));
   check('hero title is plain text (XSS-safe)', !(await page.$eval('.hero', (e) => e.innerHTML)).includes('<script'));
   check('genres filtered (no adult genre)', !(await page.content()).includes('Hentai'));
   check('detail page', await visit('/anime/1000', '.detail-title', { shot: 'anime' }) && (await text('.detail-title')).length > 2);
