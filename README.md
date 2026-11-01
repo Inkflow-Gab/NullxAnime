@@ -34,7 +34,8 @@ Adding more is one `registerProvider({ id, label, resolve })` call — see [docs
 ```bash
 npm install        # only needed for tests
 npm start          # → http://localhost:8080  (any static server works)
-npm test           # headless-Chrome end-to-end tests with mocked APIs
+npm test           # jsdom smoke test: real router + pages, mocked APIs, no browser needed
+npm run test:e2e   # full end-to-end run in headless Chrome (needs Chrome / @sparticuz/chromium)
 ```
 
 ## Deploy
@@ -56,7 +57,7 @@ js/providers.js       streaming provider layer (my stream, open library, your ow
 js/player.js          custom video player (MP4/WebM/HLS)
 js/pages/             one module per route
 js/ui/                icons, cards/rails/toasts/popovers, search palette
-tests/                static server, API mocks, e2e
+tests/                serve.mjs · dom.mjs (jsdom smoke) · e2e.mjs (headless Chrome) · mock.mjs
 ```
 
 ## Credits

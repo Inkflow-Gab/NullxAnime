@@ -182,7 +182,7 @@ function episodeGrid(id, count, epLinks, marks, resumeEp, item) {
 
 function streamingHelp(id, count) {
   return html`<section class="section" id="where">
-    <div class="section-head"><div><h2>Streaming sources</h2><div class="sub">Played in the built-in player — no YouTube, no redirects</div></div></div>
+    <div class="section-head"><div><h2>Streaming sources</h2><div class="sub">Played in the built-in player — pick a source on the watch page</div></div></div>
     <div class="notice">${icon('play')}<div>Open the <a href="#/watch/${id}/1" style="color:var(--accent)">watch page</a> and use the <b>Streaming sources</b> tab to play this title from a source you configured (<b>My stream</b>) or from the Internet Archive open library.${count > 1 ? ' Your position is remembered per episode.' : ''}</div></div>
   </section>`;
 }

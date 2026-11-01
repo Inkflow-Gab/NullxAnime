@@ -3,14 +3,14 @@
 // provider you register. Nothing is embedded from YouTube and nothing bounces
 // you out to Crunchyroll/Netflix.
 
-import { html, render, $, $$, on, safeUrl, clamp } from '../util.js';
+import { html, render, $, $$, on, safeUrl, hostOf, clamp } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
 import { episodeCount, episodeLinkMap } from '../sources.js';
-import { resolveSources, getSourceConfig, setSourceConfig } from '../providers.js';
+import { resolveSources, getSourceConfig, setSourceConfig, expandTemplate } from '../providers.js';
 import { getSettings, setSetting, getMarks, toggleMark, getEntry, saveEntry, pushHistory, getPos, setPos, getMyLink, setMyLink, subscribe } from '../store.js';
 import { go } from '../router.js';
 
@@ -180,6 +180,7 @@ export default async function watch(ctx) {
         </div>
         <div class="row" style="flex-wrap:wrap;gap:8px">
           <button class="btn primary" type="submit">${icon('play')} Save &amp; play</button>
+          <button class="btn" type="button" id="srcquick">${icon('play')} Play once</button>
           <button class="btn ghost" type="button" id="srcdef">${icon('check')} Use for every title</button>
           ${cfg ? html`<button class="btn danger" type="button" id="srcdel">${icon('trash')} Forget</button>` : ''}
           <span class="spacer"></span>
@@ -187,7 +188,8 @@ export default async function watch(ctx) {
         </div>
       </form>
       ${cards.length ? cards : html`<div class="empty" style="padding:26px 10px"><h3>No provider returned a stream</h3><p>Paste a link above, or register your own provider — see <code>docs/PROVIDERS.md</code>.</p></div>`}
-      <div class="notice">${icon('info')}<div>Sources are resolved in your browser by <code>js/providers.js</code> and played by the built-in HLS/MP4 player. Only add sources you have the right to use.</div></div>`);
+      ${cfg ? html`<div class="notice">${icon('info')}<div>Sources are resolved in your browser by <code>js/providers.js</code> and played by the built-in HLS/MP4 player. Only add sources you have the right to use.</div></div>`
+        : html`<div class="notice">${icon('info')}<div><b>Set up a source in three steps.</b> 1) Paste a video (<code>.mp4</code>/<code>.webm</code>) or HLS (<code>.m3u8</code>) link above — put <code>{ep}</code> where the episode number goes, e.g. <code>https://your-host/show/{id}/{ep}.m3u8</code>. 2) Press <b>Save &amp; play</b> (or <b>Play once</b> to try it without saving). 3) Add <b>Use for every title</b> if the same template works for your whole library. Your own files and the open library below always work.</div></div>`}`);
 
     bindSources();
     if (autoplayFirst && sourceItems[0]) playSource(0);
@@ -211,6 +213,14 @@ export default async function watch(ctx) {
       paintSources();
     });
     $('#srcdel')?.addEventListener('click', () => { setSourceConfig('direct', id, null); toast('Source forgotten'); paintSources(); });
+    $('#srcquick')?.addEventListener('click', () => {
+      const template = $('#srctpl').value.trim();
+      if (!template) { toast('Paste a stream link first', 'err'); return; }
+      const src = safeUrl(expandTemplate(template, sourceCtx()));
+      if (!src) { toast('That does not look like a valid http(s) link', 'err'); return; }
+      mountPlayer({ src, poster: item.cover, label: hostOf(src) || 'My stream', autoplay: true });
+      stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   function playSource(i) {

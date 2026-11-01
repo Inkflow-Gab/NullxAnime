@@ -24,12 +24,8 @@ export const DIRECTORY = [
     ['AniDB Calendar', 'https://anidb.net/anime/schedule/?do.filter=1', 'Detailed release schedule.', ['anime']],
     ['aniSearch Calendar', 'https://www.anisearch.com/anime/calendar', 'Calendar view.', ['anime']],
   ] },
-  { id: 'watch', title: 'Official ways to watch', icon: 'tv', blurb: 'Licensed, safe and supports the studios.', items: [
-    ['Crunchyroll', 'https://www.crunchyroll.com', 'The biggest licensed catalogue, with a free tier in some regions.', ['anime', 'manga']],
-    ['Muse Asia (YouTube)', 'https://www.youtube.com/@MuseAsia', 'Free, official anime for Southeast Asia — including the Philippines.', ['anime']],
-    ['Ani-One Asia (YouTube)', 'https://www.youtube.com/@AniOneAsia', 'Free, official simulcasts and classics for Asia.', ['anime']],
+  { id: 'watch', title: 'Places to watch & open archives', icon: 'tv', blurb: 'Free, licensed, public-domain and self-hosted.', items: [
     ['HIDIVE', 'https://www.hidive.com', 'Licensed anime streaming.', ['anime']],
-    ['Netflix', 'https://www.netflix.com', 'Originals and licensed anime.', ['anime']],
     ['Bilibili', 'https://www.bilibili.tv', 'Licensed anime for Southeast Asia and beyond.', ['anime']],
     ['Amazon Prime Video', 'https://www.primevideo.com', 'Licensed catalogue.', ['anime']],
     ['RetroCrush', 'https://www.retrocrush.tv', 'Free, ad-supported classic anime (US).', ['anime']],

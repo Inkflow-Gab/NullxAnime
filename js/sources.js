@@ -7,10 +7,19 @@
 
 import { safeUrl } from './util.js';
 
+// Brands we no longer surface anywhere in the UI: no YouTube playback and no
+// Crunchyroll/Netflix redirects. AniList still returns those links, so drop them.
+const BLOCKED = /(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com|crunchyroll\.com|netflix\.com)$/i;
+export const blockedLink = (url) => {
+  const u = safeUrl(url);
+  if (!u) return true;
+  try { return BLOCKED.test(new URL(u).hostname); } catch { return true; }
+};
+
 /** Non-streaming links AniList lists for a title (official site, MAL, Twitter, …). */
 export function infoLinks(media) {
   return (media.externalLinks || [])
-    .filter((l) => l.type !== 'STREAMING' && !l.isDisabled && safeUrl(l.url))
+    .filter((l) => l.type !== 'STREAMING' && !l.isDisabled && !blockedLink(l.url))
     .map((l) => ({ site: l.site, url: safeUrl(l.url), color: l.color, type: l.type }));
 }
 
