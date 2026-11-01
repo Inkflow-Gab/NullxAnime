@@ -26,7 +26,7 @@ export function srtToVtt(srt) {
 }
 
 export function createPlayer(host, opts = {}) {
-  const { src, poster, subtitle, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
+  const { src, poster, subtitle, subtitles, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
   host.innerHTML = html`<div class="vp" tabindex="0" aria-label="${label || 'Video player'}">
     <video playsinline preload="metadata" ${poster ? html`poster="${poster}"` : ''}></video>
     <div class="vp-center"><button class="vp-bigplay" aria-label="Play">${icon('play')}</button><div class="spinner vp-spin" hidden></div></div>
@@ -88,17 +88,18 @@ export function createPlayer(host, opts = {}) {
         }
       } else v.src = src;
       if (subtitle) await addSubtitle(subtitle);
+      if (Array.isArray(subtitles)) for (const t of subtitles.slice(1)) if (t?.url) await addSubtitle(t.url, t.label || t.lang);
       if (autoplay) v.play().catch(() => {});
     } catch (e) { fail(e.message); }
   })();
 
-  async function addSubtitle(url) {
+  async function addSubtitle(url, name = 'Subtitles') {
     let href = url;
     if (/\.srt(\?|#|$)/i.test(url)) {
       try { const t = await (await fetch(url)).text(); const b = URL.createObjectURL(new Blob([srtToVtt(t)], { type: 'text/vtt' })); blobs.push(b); href = b; } catch { return; }
     }
     const tr = document.createElement('track');
-    tr.kind = 'subtitles'; tr.label = 'Subtitles'; tr.srclang = 'en'; tr.src = href; tr.default = true;
+    tr.kind = 'subtitles'; tr.label = name; tr.srclang = 'en'; tr.src = href; tr.default = true;
     v.appendChild(tr);
     btn('cc').hidden = false;
     btn('cc').classList.add('on');

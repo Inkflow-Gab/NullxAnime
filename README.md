@@ -11,16 +11,23 @@ A sleek, fast **anime + manga** hub. No captcha, no ads, no account, no tracking
 | Area | What you get |
 | --- | --- |
 | **Anime** | Hero carousel, a **Top 10 ranking** right under it (trending / most popular / top rated / this season), **Recently updated** (episodes that just aired, linking straight to the episode), **New releases**, **Airing soon** and **Upcoming anime with premiere dates**, plus airing / seasonal / top-rated rails, full search + filters (genre, format, status, season, year, sort), detail pages with episodes, characters, relations, recommendations, tags, staff. Data: [AniList](https://anilist.co). |
-| **Watch (legal)** | Official free YouTube streams + trailers play inline; per-episode links to the official service (Crunchyroll, Netflix, Muse Asia…); public-domain / CC video from the [Internet Archive](https://archive.org); "My link / file" player for your own media (MP4, WebM, HLS, YouTube, local files, SRT/VTT subtitles). Custom player with keyboard shortcuts, speed, quality, PiP, resume position. |
+| **Watch** | A **provider layer** ([docs/PROVIDERS.md](docs/PROVIDERS.md)) resolves video for *(title + episode)* in the browser and plays it in the built-in player: **My stream** (any video/HLS link or URL template you're allowed to use, saved per title or for every title), the **Internet Archive** public-domain / Creative-Commons library, and any provider you register. Custom player: HLS quality levels, subtitles, keyboard shortcuts, speed, PiP, resume position, auto-next. **No YouTube embeds, no Crunchyroll/Netflix redirects.** |
 | **Manga** | Home rails (popular, latest, top rated, manhwa, manhua), search + tag/origin/demographic filters, chapter lists in 18 languages, and a full reader (vertical webtoon, paged LTR/RTL, fit modes, data saver, keyboard/tap zones, auto prefetch). Data: [MangaDex](https://mangadex.org). Only *safe/suggestive* ratings. |
 | **Tracker** | One list for anime + manga: status, progress, score, history, stats, JSON backup/restore, MyAnimeList/AniList XML export. Lives in `localStorage`. |
 | **Schedule** | Per-day airing calendar in your timezone, "only my list" filter. |
 | **Discover** | Curated directory of trackers, schedules, official sources and tools (derived from [awesome-anime-sources](https://github.com/anshumanv/awesome-anime-sources), legal sources only). |
 | **Polish** | Command-palette search (`/` or `Ctrl+K`), dark / OLED / light themes, 6 accents, installable PWA + offline shell, mobile tab bar, keyboard shortcuts (`?`). |
 
-## Why there are no pirate streaming sources
+## Streaming: how sources work
 
-The repos this project took ideas from ([AniPub](https://github.com/AnimePub/AniPub), [Kitsune](https://github.com/Dovakiin0/Kitsune)) get their video by scraping unlicensed streaming sites. NullxAnime deliberately does **not** do that: it would mean distributing copyrighted shows without permission, it breaks constantly, and those hosts are where the malware and popups come from. Instead the watch page sends you to the official place for each title (often free — e.g. Muse Asia / Ani-One Asia on YouTube) and plays everything that is genuinely free to play. The provider layer is pluggable — see [docs/PROVIDERS.md](docs/PROVIDERS.md).
+The repos this project took architecture ideas from ([AniPub](https://github.com/AnimePub/AniPub), [Kitsune](https://github.com/Dovakiin0/Kitsune)) get their video by scraping unlicensed streaming sites. NullxAnime **does not** ship any of those scrapers: that would mean distributing copyrighted shows without permission, it breaks constantly, and those hosts are where the malware and pop-ups come from.
+
+Instead there is a small **provider layer** (`js/providers.js`). Two providers ship:
+
+* **My stream** — paste a video/HLS URL, or a URL template (`https://cdn.example.com/{id}/{ep}.m3u8`), that you own or are allowed to use. It plays in the app's own player; save it per title, or as the default for every title.
+* **Internet Archive** — the public-domain / Creative-Commons open library.
+
+Adding more is one `registerProvider({ id, label, resolve })` call — see [docs/PROVIDERS.md](docs/PROVIDERS.md). YouTube embeds and the Crunchyroll/Netflix launch pads have been removed; everything plays in one place.
 
 ## Run locally
 
@@ -44,7 +51,8 @@ js/main.js            bootstrap, shortcuts, PWA
 js/router.js          hash router (lazy page modules)
 js/store.js           settings, library, history, backups (localStorage)
 js/api/               anilist · mangadex · archive clients
-js/sources.js         legal watch sources (YouTube, official links, search links)
+js/sources.js         episode counts / per-episode names / information links
+js/providers.js       streaming provider layer (my stream, open library, your own)
 js/player.js          custom video player (MP4/WebM/HLS)
 js/pages/             one module per route
 js/ui/                icons, cards/rails/toasts/popovers, search palette

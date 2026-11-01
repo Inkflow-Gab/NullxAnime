@@ -302,3 +302,21 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .rank-item:nth-child(-n+3) .rank-n { -webkit-text-stroke-color: var(--accent-2); }
 .rank-item .card { position: relative; z-index: 1; }
 @media (max-width: 640px) { .rank-track { grid-auto-columns: 168px !important; } .rank-item { padding-left: 50px; } .rank-n { font-size: 78px; bottom: 30px; } }
+
+/* ---------- Streaming sources (provider layer) ---------- */
+.src-form { padding: 16px; margin-bottom: 14px; display: grid; gap: 12px; }
+.src-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.src-head small { font-size: 12.5px; }
+.src-group { padding: 12px 14px; margin-bottom: 10px; }
+.src-list { display: grid; gap: 8px; margin-top: 8px; }
+.src-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px 12px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--text); cursor: pointer; transition: all .18s; }
+.src-row:hover { background: var(--surface-2); border-color: var(--accent); transform: translateY(-1px); }
+.src-play { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; }
+.src-play svg { width: 16px; height: 16px; }
+.src-body { display: grid; gap: 2px; min-width: 0; }
+.src-body b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src-body small { font-size: 12px; }
+.src-ext { margin-left: auto; color: var(--muted); display: grid; place-items: center; }
+.src-ext svg { width: 16px; height: 16px; }
+code { font-family: var(--mono, ui-monospace, monospace); font-size: .92em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }

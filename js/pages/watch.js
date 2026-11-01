@@ -1,13 +1,16 @@
-// Watch page — plays only legal sources: official YouTube streams, trailers, the Internet Archive's open library,
-// and your own links/files. Official services (Crunchyroll, Netflix, ...) are surfaced as launch links.
+// Watch page — plays whatever the provider registry in js/providers.js resolves:
+// your own stream / URL template, the Internet Archive open library, or any
+// provider you register. Nothing is embedded from YouTube and nothing bounces
+// you out to Crunchyroll/Netflix.
 
-import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
+import { html, render, $, $$, on, safeUrl, clamp } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
-import { buildSources, episodeCount, episodeLinkMap, officialSearchLinks, streamLinks, youtubeInfo, youtubeEmbed } from '../sources.js';
+import { episodeCount, episodeLinkMap } from '../sources.js';
+import { resolveSources, getSourceConfig, setSourceConfig } from '../providers.js';
 import { getSettings, setSetting, getMarks, toggleMark, getEntry, saveEntry, pushHistory, getPos, setPos, getMyLink, setMyLink, subscribe } from '../store.js';
 import { go } from '../router.js';
 
@@ -34,16 +37,12 @@ export default async function watch(ctx) {
   if (e0 && e0.status === 'planning') saveEntry('anime', id, { status: 'current' });
 
   const posKey = `a:${id}:${ep}`;
-  const embeds = buildSources(m, ep);
-  const hasOfficial = streamLinks(m).length > 0 || !!epInfo;
   const tabs = [
-    ...embeds.filter((s) => s.id !== 'trailer'),
-    { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
-    ...embeds.filter((s) => s.id === 'trailer'),
+    { id: 'sources', kind: 'sources', label: 'Streaming sources', note: 'Provider streams, played here' },
     { id: 'library', kind: 'library', label: 'Free library', note: 'Public-domain & Creative Commons (Internet Archive)' },
     { id: 'mine', kind: 'mine', label: 'My link / file', note: 'Play your own video' },
   ];
-  let active = tabs.find((t) => t.id === ctx.query.src) || (embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official'));
+  let active = tabs.find((t) => t.id === ctx.query.src) || tabs[0];
   const defaultTab = active;
   let player = null;
   const killPlayer = () => { player?.destroy(); player = null; };
@@ -99,7 +98,7 @@ export default async function watch(ctx) {
   paintEpisodes();
   $('#eplist .current')?.scrollIntoView({ block: 'center' });
 
-  const paintTabs = () => render($('#tabs'), tabs.map((t) => html`<button role="tab" class="chip ${t.id === active.id ? 'active' : ''}" data-src="${t.id}" title="${t.note || ''}">${t.kind === 'embed' && t.id !== 'trailer' ? icon('play') : t.kind === 'services' ? icon('globe') : t.kind === 'library' ? icon('film') : t.kind === 'mine' ? icon('link') : icon('film')} ${t.label}</button>`));
+  const paintTabs = () => render($('#tabs'), tabs.map((t) => html`<button role="tab" class="chip ${t.id === active.id ? 'active' : ''}" data-src="${t.id}" title="${t.note || ''}">${t.kind === 'sources' ? icon('play') : t.kind === 'library' ? icon('film') : icon('link')} ${t.label}</button>`));
 
   /* ---------- progress / completion ---------- */
   const markWatched = (force) => {
@@ -115,20 +114,15 @@ export default async function watch(ctx) {
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
   /* ---------- stage rendering ---------- */
-  function mountPlayer({ src, subtitle, label, poster, autoplay = false }) {
+  function mountPlayer({ src, subtitle, subtitles, label, poster, autoplay = false }) {
     killPlayer();
     stage.className = 'stage';
     player = createPlayer(stage, {
-      src, subtitle, poster, label, autoplay,
+      src, subtitle, subtitles, poster, label, autoplay,
       startAt: getPos(posKey)?.pos || 0,
       onProgress: (pos, dur) => { setPos(posKey, pos, dur); if (dur && pos / dur > 0.9) toggleMark('anime', id, ep, true); },
       onEnded,
     });
-  }
-  function mountEmbed(src, title) {
-    killPlayer();
-    stage.className = 'stage';
-    stage.innerHTML = `<div class="video-frame"><iframe src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
   }
   function placeholder(iconName, title, text) {
     killPlayer();
@@ -141,33 +135,92 @@ export default async function watch(ctx) {
     paintTabs();
     render(panel, '');
     history.replaceState(null, '', `#/watch/${id}/${ep}${tab.id !== defaultTab.id ? `?src=${tab.id}` : ''}`);
-    if (tab.kind === 'embed') {
-      mountEmbed(tab.src, tab.label);
-      render(panel, html`<div class="notice">${icon('info')}<div>${tab.id === 'trailer' ? 'This is the official trailer / promo video.' : html`<b>${tab.label}</b> — an official free channel. Pick the episode inside the YouTube player; use <b>Mark watched</b> above to track progress.`}${tab.url ? html` <a href="${tab.url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Open on YouTube ${icon('ext')}</a>` : ''}</div></div>`);
-    } else if (tab.kind === 'services') servicesView();
+    if (tab.kind === 'sources') sourcesView();
     else if (tab.kind === 'library') libraryView();
     else if (tab.kind === 'mine') mineView();
   }
 
-  /* ----- Official services launch pad ----- */
-  function servicesView() {
+  /* ----- Streaming sources (provider registry) ----- */
+  const sourceCtx = () => ({ media: m, item, ep, count, title: item.title, id, idMal: m.idMal });
+  let sourceItems = [];
+
+  function sourcesView(autoplayFirst = false) {
     killPlayer();
-    stage.className = 'stage launch';
-    const streams = streamLinks(m);
-    const direct = epInfo?.url ? safeUrl(epInfo.url) : '';
-    render(stage, html`<div class="launchpad">
-      <div class="lp-top">
-        ${epInfo?.thumbnail ? html`<img src="${epInfo.thumbnail}" alt="" referrerpolicy="no-referrer">` : html`<img src="${item.cover || PLACEHOLDER}" alt="" referrerpolicy="no-referrer">`}
-        <div><h3>${item.title}</h3><p class="muted">${epLabel}${epInfo?.name ? ` · ${epInfo.name}` : ''}</p>
-          ${direct ? html`<a class="btn primary lg" href="${direct}" target="_blank" rel="noopener noreferrer">${icon('play')} Watch ${isMovie ? '' : `EP ${ep} `}on ${epInfo.site || hostOf(direct)}</a>` : streams[0] ? html`<a class="btn primary lg" href="${streams[0].url}" target="_blank" rel="noopener noreferrer">${icon('play')} Watch on ${streams[0].site}</a>` : html`<p class="muted">No official link is listed for this title yet — try the search shortcuts below.</p>`}
-        </div>
-      </div>
+    stage.className = 'stage placeholder';
+    render(stage, html`<div class="stage-msg">${icon('play')}<h3>${item.title}</h3><p>${epLabel} — choose a source below</p></div>`);
+    render(panel, html`<div id="srcbox"><div class="center-load"><div class="spinner"></div></div></div>`);
+    paintSources(autoplayFirst);
+  }
+
+  async function paintSources(autoplayFirst = false) {
+    const cfg = getSourceConfig('direct', id);
+    const groups = await resolveSources(sourceCtx());
+    const box = $('#srcbox');
+    if (!ctx.alive() || !box) return;
+    sourceItems = groups.flatMap((g) => g.items);
+    const cards = groups.map((g) => html`<div class="src-group glass">
+      <div class="src-head"><b>${g.provider.label}</b><small class="muted">${g.provider.note || ''}</small></div>
+      ${g.error ? html`<p class="muted" style="font-size:13px">${g.error}</p>` : ''}
+      ${g.items.length ? html`<div class="src-list">${g.items.map((it) => {
+        const i = sourceItems.indexOf(it);
+        return html`<div class="src-row" data-play="${i}" role="button" tabindex="0"><span class="src-play">${icon('play')}</span>
+          <span class="src-body"><b>${it.label}</b><small class="muted">${[it.type === 'hls' ? 'HLS stream' : 'Video', it.quality, it.note].filter(Boolean).join(' · ')}</small></span>
+          ${it.page ? html`<a class="src-ext" href="${it.page}" target="_blank" rel="noopener noreferrer" title="Open the source page">${icon('ext')}</a>` : ''}</div>`;
+      })}</div>` : html`<p class="muted" style="font-size:13px">${g.provider.id === 'direct' ? 'No link saved yet — paste one above.' : 'Nothing found for this title.'}</p>`}
     </div>`);
-    render(panel, html`
-      ${streams.length ? html`<h3 class="panel-h">Listed streaming services</h3><div class="stream-links">${streams.map((s) => html`<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer" style="--c:${/^#[0-9a-f]{3,8}$/i.test(s.color || '') ? s.color : 'var(--accent)'}"><span class="dot"></span><b>${s.site}</b>${s.language ? html`<small>${s.language}</small>` : ''}<span class="ext">${icon('ext')}</span></a>`)}</div>` : ''}
-      <h3 class="panel-h">Search on official services</h3>
-      <div class="stream-links">${officialSearchLinks(item.title).map((s) => html`<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer" style="--c:${s.color}"><span class="dot"></span><b>${s.site}</b><span class="ext">${icon('ext')}</span></a>`)}</div>
-      <div class="notice" style="margin-top:14px">${icon('shield')}<div>Official services require no captcha from us — NullxAnime simply links you there. Several (Muse Asia, Ani-One Asia, Crunchyroll’s free tier) offer free ad-supported viewing in many regions including the Philippines.</div></div>`);
+
+    render(box, html`
+      <form class="glass src-form" id="srcform">
+        <div class="src-head"><b>My stream</b><small class="muted">A video or HLS link you are allowed to use — a URL template plays every episode</small></div>
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          <label class="field" style="flex:1;min-width:240px">Stream URL or template
+            <input class="input" id="srctpl" placeholder="https://cdn.example.com/anime/{id}/{ep}.m3u8" value="${cfg?.template || ''}"></label>
+          <label class="field" style="flex:1;min-width:200px">Subtitles (.vtt, optional)
+            <input class="input" id="srcsub" type="url" placeholder="https://…/ep{ep0}.vtt" value="${cfg?.subtitle || ''}"></label>
+        </div>
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          <button class="btn primary" type="submit">${icon('play')} Save &amp; play</button>
+          <button class="btn ghost" type="button" id="srcdef">${icon('check')} Use for every title</button>
+          ${cfg ? html`<button class="btn danger" type="button" id="srcdel">${icon('trash')} Forget</button>` : ''}
+          <span class="spacer"></span>
+          <span class="muted" style="font-size:12px">Tokens: <code>{id}</code> <code>{idMal}</code> <code>{ep}</code> <code>{ep0}</code> <code>{title}</code> <code>{slug}</code></span>
+        </div>
+      </form>
+      ${cards.length ? cards : html`<div class="empty" style="padding:26px 10px"><h3>No provider returned a stream</h3><p>Paste a link above, or register your own provider — see <code>docs/PROVIDERS.md</code>.</p></div>`}
+      <div class="notice">${icon('info')}<div>Sources are resolved in your browser by <code>js/providers.js</code> and played by the built-in HLS/MP4 player. Only add sources you have the right to use.</div></div>`);
+
+    bindSources();
+    if (autoplayFirst && sourceItems[0]) playSource(0);
+  }
+
+  function bindSources() {
+    $('#srcform')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const template = $('#srctpl').value.trim();
+      const subtitle = $('#srcsub').value.trim();
+      if (!template) { toast('Paste a stream link first', 'err'); return; }
+      setSourceConfig('direct', id, { template, subtitle: subtitle || '' });
+      paintSources(true);
+    });
+    $('#srcdef')?.addEventListener('click', () => {
+      const template = $('#srctpl').value.trim();
+      const subtitle = $('#srcsub').value.trim();
+      if (!template) { toast('Paste a stream link first', 'err'); return; }
+      setSourceConfig('direct', null, { template, subtitle: subtitle || '' });
+      toast('Saved as the default for every title');
+      paintSources();
+    });
+    $('#srcdel')?.addEventListener('click', () => { setSourceConfig('direct', id, null); toast('Source forgotten'); paintSources(); });
+  }
+
+  function playSource(i) {
+    const it = sourceItems[i];
+    if (!it) return;
+    mountPlayer({
+      src: it.src, poster: it.poster || item.cover, label: it.label, autoplay: true,
+      subtitle: it.subtitles?.[0]?.url, subtitles: it.subtitles,
+    });
+    stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   /* ----- Internet Archive free library ----- */
@@ -208,10 +261,10 @@ export default async function watch(ctx) {
 
   /* ----- My link / local file ----- */
   function mineView() {
-    placeholder('link', 'Play your own video', 'Paste a direct video link (MP4, WebM, HLS .m3u8) or a YouTube link — or pick a file from your device. Only use content you have the right to watch.');
+    placeholder('link', 'Play your own video', 'Paste a direct video link (MP4, WebM, HLS .m3u8) or pick a file from your device. Only use content you have the right to watch.');
     const saved = getMyLink(id, ep);
     render(panel, html`<form id="mineform" class="mine-form glass">
-      <label class="field">Video link<input class="input" id="mineurl" type="url" placeholder="https://… .mp4 / .m3u8 / youtube.com/watch?v=…" value="${saved?.url || ''}"></label>
+      <label class="field">Video link<input class="input" id="mineurl" type="url" placeholder="https://… .mp4 / .webm / .m3u8" value="${saved?.url || ''}"></label>
       <label class="field">Subtitles link (optional, .vtt or .srt)<input class="input" id="minesub" type="url" placeholder="https://… .vtt" value="${saved?.sub || ''}"></label>
       <div class="row"><button class="btn primary">${icon('play')} Play link</button>${saved ? html`<button type="button" class="btn danger" id="minedel">${icon('trash')} Forget link</button>` : ''}
         <span class="spacer"></span>
@@ -221,8 +274,6 @@ export default async function watch(ctx) {
     </form>`);
     let subBlob = '';
     const playUrl = (url, sub) => {
-      const yt = youtubeInfo(url);
-      if (yt) { mountEmbed(youtubeEmbed(yt), 'My video'); return; }
       mountPlayer({ src: url, subtitle: sub || undefined, label: 'My video', poster: item.cover, autoplay: true });
     };
     $('#mineform').addEventListener('submit', (e) => {
@@ -257,6 +308,7 @@ export default async function watch(ctx) {
 
   /* ---------- events ---------- */
   on(ctx.el, 'click', '[data-src]', (e, t) => select(tabs.find((x) => x.id === t.dataset.src)));
+  on(ctx.el, 'click', '[data-play]', (e, t) => { if (e.target.closest('a')) return; e.preventDefault(); playSource(Number(t.dataset.play)); });
   $('#markbtn').addEventListener('click', () => { const on_ = toggleMark('anime', id, ep); if (on_) { const e = getEntry('anime', id); if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format }); } });
   $('#autonext').addEventListener('change', (e) => setSetting('autoNext', e.target.checked));
   $('#jump')?.addEventListener('change', (e) => { const n = clamp(parseInt(e.target.value, 10) || 1, 1, count); $(`.ep-row[data-ep="${n}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); });

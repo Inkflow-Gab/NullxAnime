@@ -5,7 +5,7 @@ import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { card, rail, fromAnime, titleOf, fmtFormat, fmtStatus, toast, skelRail, errorBox, openLibraryMenu, setStatus, PLACEHOLDER } from '../ui/components.js';
 import { getEntry, saveEntry, getMarks, toggleMark, lastHistory, subscribe, statusLabel, STATUSES } from '../store.js';
-import { episodeCount, episodeLinkMap, streamLinks, infoLinks, trailerEmbed } from '../sources.js';
+import { episodeCount, episodeLinkMap, infoLinks } from '../sources.js';
 
 export default async function anime(ctx) {
   const id = ctx.params.id;
@@ -32,7 +32,6 @@ export default async function anime(ctx) {
     const banner = m.bannerImage || m.coverImage?.extraLarge;
     const tags = (m.tags || []).filter((t) => !t.isMediaSpoiler && !t.isGeneralSpoiler).slice(0, 14);
     const synonyms = [...new Set([m.title.english, m.title.native, ...(m.synonyms || [])].filter((t) => t && t !== item.title))].slice(0, 3);
-    const streams = streamLinks(m);
     const rel = (m.relations?.edges || []).filter((e) => e.node && !e.node.isAdult);
     const recs = (m.recommendations?.nodes || []).map((n) => n.mediaRecommendation).filter((x) => x && !x.isAdult);
 
@@ -61,7 +60,6 @@ export default async function anime(ctx) {
             <div class="detail-actions">
               ${count ? html`<a class="btn primary lg" href="#/watch/${id}/${resumeEp}">${icon('play')} ${last || entry?.progress ? `Continue · EP ${resumeEp}` : count === 1 ? 'Watch' : 'Start · EP 1'}</a>` : html`<span class="btn lg disabled">${icon('clock')} Not released yet</span>`}
               <button class="btn lg" data-action="lib-menu" data-key="anime:${id}">${icon(entry ? 'check' : 'plus')} ${entry ? statusLabel(entry.status, 'anime') : 'Add to list'}</button>
-              ${embedFor(m) ? html`<button class="btn lg ghost" data-trailer>${icon('film')} Trailer</button>` : ''}
               ${manga ? html`<a class="btn lg ghost" href="#/search${hashQuery({ type: 'manga', q: titleOf(manga.node) })}">${icon('book')} Read the manga</a>` : ''}
               <button class="btn lg ghost" data-share aria-label="Copy link">${icon('share')}</button>
             </div>
@@ -79,7 +77,7 @@ export default async function anime(ctx) {
               ${count ? episodeGrid(id, count, epLinks, marks, resumeEp, item) : ''}
             </section>
 
-            ${watchHelp(streams)}
+            ${streamingHelp(id, count)}
 
             ${m.characters?.edges?.length ? html`<section class="section"><div class="section-head"><h2>Characters</h2></div>
               <div class="chars">${m.characters.edges.map((e) => html`<div class="char"><img loading="lazy" src="${e.node.image?.large || PLACEHOLDER}" alt="" referrerpolicy="no-referrer">
@@ -121,7 +119,6 @@ export default async function anime(ctx) {
     const root = ctx.el;
     $('[data-more]', root)?.addEventListener('click', (e) => { $('#desc', root).classList.remove('collapsed'); e.target.remove(); });
     $('[data-share]', root)?.addEventListener('click', () => copyText(location.href).then(() => toast('Link copied')));
-    $('[data-trailer]', root)?.addEventListener('click', () => openTrailer(m));
     $('[data-markall]', root)?.addEventListener('click', () => {
       for (let e = 1; e <= count; e++) toggleMark('anime', id, e, true);
       saveEntry('anime', id, { progress: count, status: 'completed' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
@@ -167,22 +164,6 @@ export default async function anime(ctx) {
   ctx.cleanup(unsub);
 }
 
-const embedFor = (m) => trailerEmbed(m.trailer);
-
-function openTrailer(m) {
-  const src = trailerEmbed(m.trailer);
-  if (!src) return;
-  const el = document.createElement('div');
-  el.className = 'scrim'; el.style.alignItems = 'center'; el.style.padding = '14px';
-  el.innerHTML = `<div class="modal" style="width:min(960px,100%);background:#000;overflow:hidden"><div class="video-frame"><iframe src="${src}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Trailer"></iframe></div></div>`;
-  const close = () => { el.remove(); document.removeEventListener('keydown', esc); document.body.classList.remove('no-scroll'); };
-  const esc = (e) => { if (e.key === 'Escape') close(); };
-  document.addEventListener('keydown', esc);
-  el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
-  document.body.classList.add('no-scroll');
-  document.getElementById('overlay-root').appendChild(el);
-}
-
 function episodeGrid(id, count, epLinks, marks, resumeEp, item) {
   const MAX = 1000;
   const n = Math.min(count, MAX);
@@ -199,12 +180,10 @@ function episodeGrid(id, count, epLinks, marks, resumeEp, item) {
   })}</div>${count > MAX ? html`<p class="muted" style="margin-top:12px">Showing the first ${MAX} episodes.</p>` : ''}`;
 }
 
-function watchHelp(streams) {
+function streamingHelp(id, count) {
   return html`<section class="section" id="where">
-    <div class="section-head"><div><h2>Where to watch</h2><div class="sub">Official, legal sources for this title</div></div></div>
-    ${streams.length ? html`<div class="stream-links">${streams.map((s) => html`<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer" style="--c:${/^#[0-9a-f]{3,8}$/i.test(s.color || '') ? s.color : 'var(--accent)'}">
-      <span class="dot"></span><b>${s.site}</b>${s.language ? html`<small>${s.language}</small>` : ''}${s.yt ? html`<span class="badge good">Plays here</span>` : html`<span class="ext">${icon('ext')}</span>`}</a>`)}</div>`
-      : html`<p class="muted">No official streaming links are listed for this title yet. Open the watch page for search shortcuts to official services.</p>`}
+    <div class="section-head"><div><h2>Streaming sources</h2><div class="sub">Played in the built-in player — no YouTube, no redirects</div></div></div>
+    <div class="notice">${icon('play')}<div>Open the <a href="#/watch/${id}/1" style="color:var(--accent)">watch page</a> and use the <b>Streaming sources</b> tab to play this title from a source you configured (<b>My stream</b>) or from the Internet Archive open library.${count > 1 ? ' Your position is remembered per episode.' : ''}</div></div>
   </section>`;
 }
 

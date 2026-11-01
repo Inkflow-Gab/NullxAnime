@@ -78,11 +78,20 @@ try {
   check('detail page', await visit('/anime/1000', '.detail-title', { shot: 'anime' }) && (await text('.detail-title')).length > 2);
   check('detail strips <script> from synopsis', !(await page.$eval('#desc', (e) => e.innerHTML)).includes('<script') && (await page.$eval('#desc', (e) => e.innerHTML)).includes('<i>unforgettable</i>'));
   check('detail lists episodes', (await count('.ep')) >= 5);
-  check('detail has official stream links', (await count('.stream-link')) >= 2);
-  check('watch page (official youtube embed)', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }));
+  check('detail has a streaming-sources section', (await count('#where .notice')) >= 1);
+  check('watch page opens the sources tab', await visit('/watch/1000/1', '#srcbox', { shot: 'watch' }));
   check('watch page has episode list', (await count('.ep-row')) >= 5);
-  check('watch → official services tab', await (async () => { await page.click('[data-src="official"]'); await page.waitForSelector('.launchpad'); return true; })());
-  await page.screenshot({ path: SHOTS ? new URL('./__screens__/watch-official.png', import.meta.url).pathname : '/dev/null' }).catch(() => {});
+  check('sources: Internet Archive provider resolves a stream', await (async () => { await page.waitForSelector('.src-row', { timeout: 8000 }); return (await count('.src-row')) >= 1 && (await page.content()).includes('Internet Archive'); })());
+  check('sources: my stream template plays in the custom player', await (async () => {
+    await page.type('#srctpl', 'https://media.example.com/{id}/{ep}.mp4');
+    await page.evaluate(() => document.querySelector('#srcform button[type="submit"]').click());
+    await page.waitForSelector('.vp video', { timeout: 8000 });
+    const src = await page.$eval('.vp video', (v) => v.getAttribute('src') || '');
+    return src === 'https://media.example.com/1000/1.mp4';
+  })());
+  check('sources: template is remembered per title', await page.evaluate(() => !!JSON.parse(localStorage.getItem('nx:src') || '{}')['direct:1000']));
+  await page.screenshot({ path: SHOTS ? new URL('./__screens__/watch-sources.png', import.meta.url).pathname : '/dev/null' }).catch(() => {});
+  await page.evaluate(() => localStorage.removeItem('nx:src'));
   check('watch → free library tab lists results', await (async () => { await page.click('[data-src="library"]'); await page.waitForSelector('.lib-item', { timeout: 6000 }); return true; })());
   check('watch → library item plays in custom player', await (async () => { await page.click('.lib-item'); await page.waitForSelector('.vp video', { timeout: 6000 }); return true; })());
   check('mark watched updates tracker', await (async () => { await visit('/watch/1000/2', '#markbtn'); await page.click('#markbtn'); await new Promise((r) => setTimeout(r, 300)); const s = JSON.parse(await page.evaluate(() => localStorage.getItem('nx:marks'))); return s['anime:1000']?.includes(2); })());

@@ -6,7 +6,7 @@ const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'css/base.css', 'css/components.css', 'css/pages.css',
   'assets/logo.svg', 'assets/icon-192.png', 'assets/icon-512.png',
-  'js/main.js', 'js/router.js', 'js/util.js', 'js/store.js', 'js/cache.js', 'js/sources.js', 'js/player.js',
+  'js/main.js', 'js/router.js', 'js/util.js', 'js/store.js', 'js/cache.js', 'js/sources.js', 'js/providers.js', 'js/player.js',
   'js/api/anilist.js', 'js/api/mangadex.js', 'js/api/archive.js',
   'js/ui/icons.js', 'js/ui/components.js', 'js/ui/palette.js',
   'js/pages/home.js', 'js/pages/anime.js', 'js/pages/watch.js', 'js/pages/free.js', 'js/pages/mangaHome.js', 'js/pages/mangaDetail.js',
