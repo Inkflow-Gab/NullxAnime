@@ -26,7 +26,7 @@ The worker fetches provider HTML, issues time-limited signed URLs for sources, a
 
 ### Senshi mirrors (adapted from Kitsune)
 
-The same worker exposes `/senshi?mal={id}&episode={number}&audio=sub|dub`, fetching Senshi's episode-embeds endpoint and returning validated HTTPS links for the `url`, `server2`, and `serverFM` fields (Senshi, StreamNin, and FileMoon). The watch tab looks up the title's AniList-provided MyAnimeList ID and lets users select returned mirrors. Update/redeploy the worker to use it; the repo does not include a hosted worker. Embed permissions, ads, CORS and subtitle/audio availability are controlled by the mirror. The Senshi API and playback were not live-tested here. These are embed fallbacks, not Kitsune's VidCloud stream extractor.
+The same worker exposes `/senshi?mal={id}&episode={number}&audio=sub|dub`, fetching Senshi's episode-embeds endpoint and returning validated HTTPS links for the `url`, `server2`, and `serverFM` fields (Senshi, StreamNin, and FileMoon). The watch tab looks up the title's AniList-provided MyAnimeList ID and lets users select returned mirrors. Update/redeploy the worker to use it; the repo does not include a hosted worker. Embed permissions, ads, CORS and subtitle/audio availability are controlled by the mirror. A GitHub Actions request to Senshi for a sample episode returned HTTP 403 without a CORS header; a deployed worker or other network may behave differently, but neither mirror playback nor bypass has been verified. These are embed fallbacks, not Kitsune's VidCloud stream extractor.
 
 ### More servers: compatible provider API
 

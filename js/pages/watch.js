@@ -40,8 +40,8 @@ export default async function watch(ctx) {
   const tabs = [
     ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
     ...embeds.filter((s) => s.id !== 'trailer'),
-    { id: 'kitsune', kind: 'kitsune', label: 'More servers', note: 'Compatible provider API required' },
-    { id: 'senshi', kind: 'senshi', label: 'Senshi', note: 'Kitsune-derived mirrors (worker required)' },
+    { id: 'kitsune', kind: 'kitsune', label: 'More servers · setup', note: 'Compatible provider API required' },
+    { id: 'senshi', kind: 'senshi', label: 'Senshi · setup', note: 'Kitsune-derived mirrors (worker required)' },
     { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' },
     { id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'Connect an AniPub deployment' },
     { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
