@@ -103,7 +103,7 @@ try {
   check('detail strips <script> from synopsis', !(await page.$eval('#desc', (e) => e.innerHTML)).includes('<script') && (await page.$eval('#desc', (e) => e.innerHTML)).includes('<i>unforgettable</i>'));
   check('detail lists episodes', (await count('.ep')) >= 5);
   check('detail has official stream links', (await count('.stream-link')) >= 2);
-  check('watch page defaults to the episode player without setup', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }) && await page.$eval('#stage iframe', (e) => e.src === 'https://megaplay.buzz/stream/ani/1000/1/sub') && !(await page.$('#deployment-url')));
+  check('watch page defaults to the episode player without setup', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }) && await page.$eval('#stage iframe', (e) => e.src === 'https://megaplay.buzz/stream/ani/1000/1/sub' && !e.hasAttribute('sandbox')) && !(await page.$('#deployment-url')));
   check('instant player remembers audio and episode', await (async () => {
     await page.click('[data-instant-audio="dub"]');
     const switched = await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/dub'));

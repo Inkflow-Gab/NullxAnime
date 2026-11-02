@@ -10,7 +10,7 @@ try {
   const probeUrl = 'https://inkflow-gab.github.io/__nullx_live_probe__';
   await page.setRequestInterception(true);
   page.on('request', (request) => {
-    if (request.url() === probeUrl) return request.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><iframe src="https://megaplay.buzz/stream/ani/154587/1/sub" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" style="width:1000px;height:600px"></iframe>' });
+    if (request.url() === probeUrl) return request.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><iframe src="https://megaplay.buzz/stream/ani/154587/1/sub" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" style="width:1000px;height:600px"></iframe>' });
     return request.continue();
   });
   await page.goto(probeUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });

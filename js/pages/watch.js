@@ -171,7 +171,8 @@ export default async function watch(ctx) {
     const drawPlayer = () => {
       completed = false; lastProgress = 0;
       const src = instantEmbed(id, ep, audio);
-      mountEmbed(src, `${item.title} — ${epLabel}`, true);
+      // MegaPlay explicitly refuses sandboxed embeds. It remains cross-origin.
+      mountEmbed(src, `${item.title} — ${epLabel}`);
       render(panel, html`<div class="instant-panel glass">
         <div><b>Instant play</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
         <div class="seg" aria-label="Audio language"><button type="button" data-instant-audio="sub" class="${audio === 'sub' ? 'on' : ''}" aria-pressed="${audio === 'sub'}">Sub</button><button type="button" data-instant-audio="dub" class="${audio === 'dub' ? 'on' : ''}" aria-pressed="${audio === 'dub'}">Dub</button></div>
