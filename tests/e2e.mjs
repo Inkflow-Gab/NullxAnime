@@ -8,6 +8,17 @@ import puppeteer from 'puppeteer-core';
 import { serve } from './serve.mjs';
 import { anilist, mangadex, archive, imageFor } from './mock.mjs';
 
+// Publish unexpected browser-test failures as actionable GitHub annotations.
+if (process.env.GITHUB_ACTIONS) {
+  const report = (error) => {
+    const message = String(error?.stack || error).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+    console.error(`::error::${message}`);
+    process.exitCode = 1;
+  };
+  process.on('uncaughtException', report);
+  process.on('unhandledRejection', report);
+}
+
 const PORT = 8123;
 const BASE = `http://localhost:${PORT}/`;
 const SHOTS = !!process.env.SHOTS;
@@ -49,7 +60,7 @@ async function mockNetwork(page) {
 }
 
 const results = [];
-const check = (name, ok, extra = '') => { results.push({ name, ok }); console.log(`${ok ? '  ✓' : '  ✗'} ${name}${ok ? '' : ` ${extra}`}`); };
+const check = (name, ok, extra = '') => { results.push({ name, ok }); console.log(`${ok ? '  ✓' : '  ✗'} ${name}${ok ? '' : ` ${extra}`}`); if (!ok && process.env.GITHUB_ACTIONS) console.error(`::error::Check failed: ${name}`); };
 
 const server = await serve(PORT);
 const browser = await launch();
