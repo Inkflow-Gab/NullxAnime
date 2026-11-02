@@ -15,7 +15,7 @@ export default async function free(ctx) {
   ctx.cleanup(() => player?.destroy());
   ctx.render(html`<div class="container page">
     <div class="search-head"><div><h1 class="page-title">Free &amp; open library</h1>
-      <p class="muted">Public-domain and Creative-Commons video from the Internet Archive — 100% legal, no captcha, no ads.</p></div></div>
+      <p class="muted">Public-domain and Creative-Commons video from the Internet Archive. Availability and rights vary by item.</p></div></div>
     <form class="filter-bar" id="f"><div class="filter-search">${icon('search')}<input class="input" id="q" value="${q}" placeholder="Search the open library…"></div><button class="btn primary">Search</button></form>
     <div class="chips" style="margin-bottom:18px">${TOPICS.map((t) => html`<button class="chip" data-t="${t}">${t}</button>`)}</div>
     <div class="notice" style="margin-bottom:20px">${icon('info')}<div>Most modern anime is commercially licensed and will not be here. For those, use each title’s <b>Where to watch</b> section to find the official (often free) stream.</div></div>

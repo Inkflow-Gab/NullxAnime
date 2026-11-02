@@ -43,6 +43,12 @@ export function instantEmbed(id, episode, audio = 'sub') {
   return `${INSTANT_ORIGIN}/stream/ani/${Number(id)}/${episode}/${audio}`;
 }
 
+/** Senshi embed mirrors exposed by the separately deployed worker. */
+export function senshiWatch(base, mal, episode, audio, signal) {
+  if (!Number.isSafeInteger(Number(mal)) || Number(mal) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid title, episode or audio.');
+  return json(`${baseUrl(base)}/senshi?${new URLSearchParams({ mal: String(mal), episode: String(episode), audio })}`, signal);
+}
+
 /** Client for NullxAnime's own AnimeGG worker. */
 export function animeggSearch(base, query, signal) {
   const q = String(query || '').trim();

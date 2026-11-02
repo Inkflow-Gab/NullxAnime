@@ -3,7 +3,8 @@
 import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
-import { INSTANT_ORIGIN, instantEmbed, baseUrl, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
+import { INSTANT_ORIGIN, instantEmbed, baseUrl, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
+import { kitsuneEpisodes, kitsuneChoices, kitsuneWatch, kitsuneStreams, kitsuneProxy } from '../api/kitsune.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
@@ -39,6 +40,8 @@ export default async function watch(ctx) {
   const tabs = [
     ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
     ...embeds.filter((s) => s.id !== 'trailer'),
+    { id: 'kitsune', kind: 'kitsune', label: 'More servers', note: 'Compatible provider API required' },
+    { id: 'senshi', kind: 'senshi', label: 'Senshi', note: 'Kitsune-derived mirrors (worker required)' },
     { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' },
     { id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'Connect an AniPub deployment' },
     { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
@@ -58,6 +61,7 @@ export default async function watch(ctx) {
     <div class="watch-head">
       <a class="btn sm ghost" href="#/anime/${id}">${icon('chevL')} ${item.title}</a>
       <div class="spacer"></div>
+      <button class="btn sm ghost" id="copy-episode">${icon('link')} Copy episode link</button>
       <button class="btn sm ghost" data-action="shortcuts">${icon('keyboard')} Shortcuts</button>
     </div>
     <div class="watch">
@@ -77,7 +81,7 @@ export default async function watch(ctx) {
       </div>
       <aside class="watch-side glass">
         <div class="side-head"><b>${isMovie ? 'Movie' : 'Episodes'}</b><span class="muted" id="seen-count"></span></div>
-        ${count > 60 ? html`<div style="padding:0 12px 10px"><input class="input" id="jump" type="number" min="1" max="${count}" placeholder="Jump to episode…"></div>` : ''}
+        ${count > 1 ? html`<div class="episode-filter"><label class="sr-only" for="episode-search">Filter episodes</label><input class="input" id="episode-search" type="search" placeholder="Find episode or title…" autocomplete="off"><span id="episode-results" class="muted" aria-live="polite"></span></div>` : ''}
         <div class="ep-list" id="eplist">${Array.from({ length: Math.min(count, 1000) }, (_, i) => html`<a class="ep-row" href="#/watch/${id}/${i + 1}" data-ep="${i + 1}"><span class="n">${i + 1}</span><span class="t">${epLinks.get(i + 1)?.name || (isMovie ? 'Full feature' : `Episode ${i + 1}`)}</span><span class="ck"></span></a>`)}</div>
       </aside>
     </div>
@@ -114,7 +118,7 @@ export default async function watch(ctx) {
     }
     return now;
   };
-  const sourceQuery = () => ['animegg', 'anipub'].includes(active.id) ? `?src=${active.id}` : '';
+  const sourceQuery = () => ['animegg', 'anipub', 'senshi', 'kitsune'].includes(active.id) ? `?src=${active.id}` : '';
   const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`); };
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
@@ -160,6 +164,8 @@ export default async function watch(ctx) {
     else if (tab.kind === 'services') servicesView();
     else if (tab.kind === 'library') libraryView();
     else if (tab.kind === 'mine') mineView();
+    else if (tab.kind === 'kitsune') kitsuneView();
+    else if (tab.kind === 'senshi') senshiView();
     else if (tab.kind === 'animegg') animeggView();
     else if (tab.kind === 'anipub') anipubView();
   }
@@ -176,13 +182,16 @@ export default async function watch(ctx) {
       render(panel, html`<div class="instant-panel glass">
         <div><b>Instant play</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
         <div class="seg" aria-label="Audio language"><button type="button" data-instant-audio="sub" class="${audio === 'sub' ? 'on' : ''}" aria-pressed="${audio === 'sub'}">Sub</button><button type="button" data-instant-audio="dub" class="${audio === 'dub' ? 'on' : ''}" aria-pressed="${audio === 'dub'}">Dub</button></div>
-        <p class="muted instant-help">No video link needed. Availability depends on the provider and your region. If playback is blocked or this episode is missing, try the other source tabs. <a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a></p>
+        <button type="button" class="btn sm" data-instant-retry>${icon('refresh')} Retry player</button>
+        <p class="muted instant-help">No video link needed. The third-party player may show ads. Availability depends on the provider and your region. If playback is blocked or this episode is missing, try the other source tabs. <a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a></p>
       </div>`);
     };
     drawPlayer();
     panel.addEventListener('click', (event) => {
+      if (active.kind !== 'instant') return;
+      if (event.target.closest('[data-instant-retry]')) { drawPlayer(); return; }
       const button = event.target.closest('[data-instant-audio]');
-      if (!button || active.kind !== 'instant') return;
+      if (!button) return;
       audio = button.dataset.instantAudio;
       setSetting('instantAudio', audio);
       drawPlayer();
@@ -207,11 +216,11 @@ export default async function watch(ctx) {
   }
 
   /* ----- External deployments ----- */
-  const deploymentKey = (name) => name === 'AnimeGG' ? 'streamWorkerUrl' : 'anipubUrl';
+  const deploymentKey = (name) => name === 'AnimeGG' ? 'streamWorkerUrl' : name === 'Kitsune API' ? 'kitsuneApiUrl' : 'anipubUrl';
   function deploymentForm(name, defaultUrl = '') {
     const saved = getSettings()[deploymentKey(name)] || defaultUrl;
     return html`<form id="deployment-form" class="mine-form glass">
-      <label class="field">${name === 'AnimeGG' ? 'Streaming worker URL' : 'AniPub deployment URL'}<input id="deployment-url" class="input" type="url" required value="${saved}" placeholder="${name === 'AnimeGG' ? 'https://your-worker.workers.dev' : 'https://your-deployment.example'}"></label>
+      <label class="field">${name === 'AnimeGG' ? 'Streaming worker URL' : name === 'Kitsune API' ? 'Provider API base URL' : 'AniPub deployment URL'}<input id="deployment-url" class="input" type="url" required value="${saved}" placeholder="${name === 'AnimeGG' ? 'https://your-worker.workers.dev' : name === 'Kitsune API' ? 'https://your-provider.example/api' : 'https://your-deployment.example'}"></label>
       <div class="row"><button class="btn primary">Connect</button><button type="button" class="btn" id="deployment-forget">Forget URL</button><span class="muted">Stored in this browser. HTTPS and cross-origin access are required.</span></div>
     </form><div id="deployment-results" aria-live="polite"></div>`;
   }
@@ -219,6 +228,94 @@ export default async function watch(ctx) {
     if (error.name === 'AbortError' || !ctx.alive()) return;
     const box = $('#deployment-results', panel);
     if (box) render(box, html`<div class="notice" role="alert">${error.message || 'Could not load this source.'}</div>`);
+  }
+  /* The optional API returns per-title provider availability and per-episode mirrors. */
+  function kitsuneView() {
+    placeholder('film', 'More servers', 'Connect a compatible provider API to look up this episode.');
+    render(panel, html`${deploymentForm('Kitsune API')}<form id="kitsune-load" class="mine-form glass"><div><b>Kitsune-compatible providers</b><p class="muted">Optional: a separately hosted provider API is required. Availability, ads and CORS depend on each provider. Instant play still needs no setup.</p></div><label class="field">Audio<select id="kitsune-audio" class="select"><option value="sub" ${getSettings().kitsuneAudio !== 'dub' ? 'selected' : ''}>Sub</option><option value="dub" ${getSettings().kitsuneAudio === 'dub' ? 'selected' : ''}>Dub</option></select></label><button class="btn primary">Find episode ${ep} servers</button><div id="kitsune-results" aria-live="polite"></div></form>`);
+    const controller = sourceController;
+    const current = () => ctx.alive() && active.kind === 'kitsune' && !controller.signal.aborted;
+    let serial = 0, choices = [], base = '';
+    $('#deployment-forget', panel).addEventListener('click', () => { setSetting('kitsuneApiUrl', ''); select(active); });
+    const loadProvider = async () => {
+      const task = ++serial;
+      const choice = choices[Number($('#kitsune-provider', panel)?.value)];
+      if (!choice) return;
+      try {
+        placeholder('film', choice.name, 'Loading mirrors…');
+        render($('#kitsune-streams', panel), html`<p class="muted">Loading mirrors…</p>`);
+        const data = await kitsuneWatch(base, choice.path, controller.signal);
+        if (!current() || task !== serial) return;
+        const streams = kitsuneStreams(data).filter((s) => new URL(s.url).origin !== location.origin);
+        if (!streams.length) throw new Error('No playable mirrors were returned. Try another provider.');
+        render($('#kitsune-streams', panel), html`<label class="field">Mirror<select id="kitsune-mirror" class="select">${streams.map((s, i) => html`<option value="${i}">${s.server} · ${s.quality} · ${s.format}</option>`)}</select></label><p class="muted">Mirrors may block embedding or contain ads. Switch mirrors if playback fails.</p><div id="kitsune-open"></div>`);
+        const play = () => {
+          const source = streams[Number($('#kitsune-mirror', panel).value)];
+          if (source.format === 'embed') mountEmbed(source.url, `${item.title} — ${source.server}`, true);
+          else mountPlayer({ src: kitsuneProxy(base, source), subtitle: source.subtitle ? kitsuneProxy(base, { url: source.subtitle, referer: source.referer }) : undefined, format: source.format === 'hls' ? 'hls' : undefined, crossOrigin: true, label: item.title, poster: item.cover, autoplay: true });
+          render($('#kitsune-open', panel), html`<a href="${source.url}" target="_blank" rel="noopener noreferrer">Open selected mirror ${icon('ext')}</a>`);
+        };
+        $('#kitsune-mirror', panel).addEventListener('change', play); play();
+      } catch (error) { if (current() && task === serial && error.name !== 'AbortError') { placeholder('film', 'Mirror unavailable', 'Try another provider.'); render($('#kitsune-streams', panel), html`<p role="alert">${error.message}</p>`); } }
+    };
+    const load = async (event) => {
+      event.preventDefault();
+      const task = ++serial;
+      try {
+        base = baseUrl($('#deployment-url', panel).value);
+        const audio = $('#kitsune-audio', panel).value;
+        setSetting('kitsuneApiUrl', base); setSetting('kitsuneAudio', audio);
+        render($('#kitsune-results', panel), html`<p class="muted">Finding available providers…</p>`);
+        const data = await kitsuneEpisodes(base, id, controller.signal);
+        if (!current() || task !== serial) return;
+        choices = kitsuneChoices(data, id, ep, audio);
+        if (!choices.length) throw new Error('No providers reported this episode and audio. Try another audio or Instant play.');
+        render($('#kitsune-results', panel), html`<label class="field">Provider<select class="select" id="kitsune-provider">${choices.map((choice, i) => html`<option value="${i}">${choice.name}</option>`)}</select></label><div id="kitsune-streams" aria-live="polite"></div>`);
+        $('#kitsune-provider', panel).addEventListener('change', loadProvider);
+        await loadProvider();
+      } catch (error) { if (current() && task === serial && error.name !== 'AbortError') render($('#kitsune-results', panel), html`<p role="alert">${error.message}</p>`); }
+    };
+    $('#deployment-form', panel).addEventListener('submit', load);
+    $('#kitsune-load', panel).addEventListener('submit', load);
+    if (getSettings().kitsuneApiUrl) $('#kitsune-load', panel).requestSubmit();
+  }
+  function senshiView() {
+    placeholder('film', 'Senshi mirrors', 'Load available mirrors for this episode through your streaming worker.');
+    render(panel, html`${deploymentForm('AnimeGG')}<form id="senshi-load" class="mine-form glass"><div><b>Senshi mirrors</b><p class="muted">Uses the title’s MyAnimeList ID. External mirrors may show ads or block embedding. Requires an updated, separately deployed worker.</p></div><label class="field">Audio<select class="select" id="senshi-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn primary" ${m.idMal ? '' : 'disabled'}>Load episode ${ep} servers</button>${m.idMal ? '' : html`<p role="alert">No MyAnimeList ID is available for this title.</p>`}<div id="senshi-streams" aria-live="polite"></div></form>`);
+    const controller = sourceController;
+    const current = () => ctx.alive() && active.kind === 'senshi' && !controller.signal.aborted;
+    let serial = 0;
+    $('#deployment-forget', panel).addEventListener('click', () => { setSetting('streamWorkerUrl', ''); select(active); });
+    const load = async (event) => {
+      event.preventDefault();
+      const task = ++serial;
+      try {
+        if (!m.idMal) throw new Error('This title has no MyAnimeList ID.');
+        const base = baseUrl($('#deployment-url', panel).value);
+        setSetting('streamWorkerUrl', base);
+        render($('#senshi-streams', panel), html`<p class="muted">Finding mirrors…</p>`);
+        const data = await senshiWatch(base, m.idMal, ep, $('#senshi-audio', panel).value, controller.signal);
+        if (!current() || task !== serial) return;
+        const streams = (Array.isArray(data.streams) ? data.streams : []).filter((s) => {
+          const u = safeUrl(s.url);
+          if (!u || !['embed', 'video', 'hls'].includes(s.type)) return false;
+          const target = new URL(u), host = target.hostname.toLowerCase();
+          return target.protocol === 'https:' && !target.username && !target.password && !target.port && target.origin !== location.origin && !host.includes(':') && !/^[\d.]+$/.test(host) && host.includes('.') && !/(?:^|\.)(?:localhost|local|internal|home|lan)$/.test(host);
+        }).slice(0, 50);
+        if (!streams.length) throw new Error('No mirrors found for this episode and audio.');
+        render($('#senshi-streams', panel), html`<label class="field">Server<select id="senshi-server" class="select">${streams.map((s, i) => html`<option value="${i}">${s.server || 'Mirror'} · ${s.type}</option>`)}</select></label><p class="muted">If a mirror fails, choose another. Mirrors control their own ads and playback.</p><p id="senshi-open"></p>`);
+        const play = () => {
+          const source = streams[Number($('#senshi-server', panel).value)];
+          if (source.type === 'embed') mountEmbed(source.url, `${item.title} — ${source.server}`, true);
+          else mountPlayer({ src: source.url, format: source.type === 'hls' ? 'hls' : undefined, crossOrigin: true, label: item.title, poster: item.cover, autoplay: true });
+          render($('#senshi-open', panel), html`<a href="${source.url}" target="_blank" rel="noopener noreferrer">Open selected mirror ${icon('ext')}</a>`);
+        };
+        $('#senshi-server', panel).addEventListener('change', play); play();
+      } catch (error) { if (current() && task === serial && error.name !== 'AbortError') render($('#senshi-streams', panel), html`<p role="alert">${error.message}</p>`); }
+    };
+    $('#deployment-form', panel).addEventListener('submit', load);
+    $('#senshi-load', panel).addEventListener('submit', load);
+    if (getSettings().streamWorkerUrl && m.idMal) $('#senshi-load', panel).requestSubmit();
   }
   function animeggView() {
     placeholder('film', 'AnimeGG', 'Search for this title using your NullxAnime streaming worker.');
@@ -436,7 +533,18 @@ export default async function watch(ctx) {
   });
   $('#markbtn').addEventListener('click', () => { const on_ = toggleMark('anime', id, ep); if (on_) { const e = getEntry('anime', id); if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format }); } });
   $('#autonext').addEventListener('change', (e) => setSetting('autoNext', e.target.checked));
-  $('#jump')?.addEventListener('change', (e) => { const n = clamp(parseInt(e.target.value, 10) || 1, 1, count); $(`.ep-row[data-ep="${n}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+  $('#episode-search')?.addEventListener('input', (event) => {
+    const query = event.target.value.trim().toLowerCase(); let visible = 0;
+    $$('.ep-row', ctx.el).forEach((row) => {
+      const match = !query || row.dataset.ep === query || row.querySelector('.t').textContent.toLowerCase().includes(query);
+      row.hidden = !match; if (match) visible++;
+    });
+    $('#episode-results').textContent = query ? `${visible} episode${visible === 1 ? '' : 's'} found` : '';
+  });
+  $('#copy-episode').addEventListener('click', async () => {
+    try { await copyText(location.href); toast('Episode link copied'); }
+    catch { toast('Could not copy the link', 'err'); }
+  });
   const onKey = (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.toLowerCase() === 'n' && ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`);

@@ -25,7 +25,7 @@ export default async function settings(ctx) {
         <div class="set-row"><div><b>Anime titles</b><small>Which title to show first.</small></div>
           <div class="seg">${[['romaji', 'Romaji'], ['english', 'English'], ['native', 'Native']].map(([v, l]) => html`<button data-set="titleLang" data-v="${v}" class="${s.titleLang === v ? 'on' : ''}">${l}</button>`)}</div></div>
         <div class="set-row"><div><b>Airing countdowns on cards</b><small>Show “EP 5 · 2d 4h” badges.</small></div>${toggle('showCountdown', s.showCountdown)}</div>
-        <div class="set-row"><div><b>TV mode</b><small>Larger controls and arrow-key navigation for compatible remotes. Enter activates the focused item.</small></div>${toggle('tvMode', s.tvMode)}</div>
+        <div class="set-row"><div><b>TV mode</b><small>Auto detects known TVs; override it for larger controls and remote navigation.</small></div><div class="seg" role="group" aria-label="TV mode">${[['auto', 'Auto'], ['on', 'On'], ['off', 'Off']].map(([v, label]) => html`<button data-tv="${v}" class="${(s.tvMode == null ? 'auto' : s.tvMode ? 'on' : 'off') === v ? 'on' : ''}" aria-pressed="${(s.tvMode == null ? 'auto' : s.tvMode ? 'on' : 'off') === v}">${label}</button>`)}</div></div>
         <div class="set-row"><div><b>Reduce motion</b><small>Disable carousels and animations.</small></div>${toggle('reduceMotion', s.reduceMotion)}</div>
       </section>
 
@@ -66,6 +66,7 @@ export default async function settings(ctx) {
   };
   const toggle = (key, on_) => html`<label class="switch"><input type="checkbox" data-tg="${key}" ${on_ ? 'checked' : ''}><i></i></label>`;
   draw();
+  on(ctx.el, 'click', '[data-tv]', (e, t) => { setSetting('tvMode', t.dataset.tv === 'auto' ? null : t.dataset.tv === 'on'); draw(); });
   on(ctx.el, 'click', '[data-set]', (e, t) => { setSetting(t.dataset.set, t.dataset.v); draw(); });
   on(ctx.el, 'change', '[data-tg]', (e, t) => setSetting(t.dataset.tg, t.checked));
   on(ctx.el, 'change', '[data-sel]', (e, t) => setSetting(t.dataset.sel, t.value));

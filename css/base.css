@@ -225,3 +225,15 @@ html[data-tv-mode="on"] body { font-size: 17px; }
 html[data-tv-mode="on"] :focus { outline: 3px solid #f6d68a; outline-offset: 4px; }
 html[data-tv-mode="on"] .nav a, html[data-tv-mode="on"] .btn, html[data-tv-mode="on"] .chip { min-height: 48px; }
 html[data-tv-mode="on"] .card .quick { opacity: 1; transform: none; }
+
+/* Developer signature: chromatic ghost layers, kept still for reduced motion. */
+.dev-signature { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; padding-top: 8px; }
+.dev-label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.dev-name { position: relative; isolation: isolate; font-family: 'Cinzel', Georgia, serif; font-size: clamp(30px, 4vw, 44px); font-weight: 800; line-height: 1; letter-spacing: .06em; color: var(--text); text-shadow: 0 0 24px rgba(var(--accent-rgb), .5); }
+.dev-name::before, .dev-name::after { content: attr(data-text); position: absolute; inset: 0; pointer-events: none; }
+.dev-name::before { color: #fa4ad5; z-index: -1; animation: gab-glitch-a 3.8s infinite steps(1, end); }
+.dev-name::after { color: #38e8ff; z-index: -1; animation: gab-glitch-b 3.8s infinite steps(1, end); }
+.dev-star { color: #f8c95d; font-size: 14px; }
+@keyframes gab-glitch-a { 0%, 87%, 100% { transform: translate(0); } 88%, 92% { transform: translate(-3px, 1px); } 90%, 94% { transform: translate(4px, -2px); color: #ffe25c; } }
+@keyframes gab-glitch-b { 0%, 87%, 100% { transform: translate(0); } 88%, 93% { transform: translate(3px, -1px); } 90%, 95% { transform: translate(-4px, 2px); color: #a56dff; } }
+@media (prefers-reduced-motion: reduce) { .dev-name::before, .dev-name::after { animation: none; } }

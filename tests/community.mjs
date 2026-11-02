@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { baseUrl, instantEmbed, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
+import { baseUrl, instantEmbed, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
 
 assert.equal(instantEmbed(154587, 2), 'https://megaplay.buzz/stream/ani/154587/2/sub');
 assert.equal(instantEmbed('154587', 2, 'dub'), 'https://megaplay.buzz/stream/ani/154587/2/dub');
 for (const args of [['../1', 1], [0, 1], [1, -1], [1, 1, 'raw'], [1, 1.5]]) assert.throws(() => instantEmbed(...args));
 assert.equal(baseUrl('https://example.org/root/'), 'https://example.org/root');
 for (const bad of ['http://example.org', 'https://a:b@example.org', 'javascript:alert(1)', 'https://example.org/?secret=x']) assert.throws(() => baseUrl(bad));
+assert.throws(() => senshiWatch('https://example.org', '../private', 1, 'sub'));
+assert.throws(() => senshiWatch('https://example.org', 1, 0, 'sub'));
 assert.throws(() => animeggEpisodes('https://example.org', '../private'));
 assert.throws(() => animeggWatch('https://example.org', 'series', 0, 'sub'));
 assert.equal(anipubPlayer('https://example.org', 12, 2, 'dub'), 'https://example.org/AniPlayer/12/1?type=dub');
@@ -14,5 +16,6 @@ const oldFetch = globalThis.fetch;
 globalThis.fetch = async () => new Response(JSON.stringify({ Name: 'Test', Id: 3 }), { status: 200 });
 assert.equal((await anipubSearch('https://example.org', 'Test'))[0].Id, 3);
 assert.equal((await animeggSearch('https://example.org', 'Test')).Id, 3);
+assert.equal((await senshiWatch('https://example.org', 12, 1, 'sub')).Id, 3);
 globalThis.fetch = oldFetch;
 console.log('Community provider client checks passed');
