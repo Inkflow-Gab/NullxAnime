@@ -382,13 +382,13 @@ export default async function watch(ctx) {
   }
 
   /* ---------- events ---------- */
-  on(ctx.el, 'click', '[data-src]', (e, t) => { select(tabs.find((x) => x.id === t.dataset.src)); $(`[data-src="${t.dataset.src}"]`, ctx.el)?.focus(); });
+  on(ctx.el, 'click', '[data-src]', (e, t) => { select(tabs.find((x) => x.id === t.dataset.src)); $(`[data-src="${t.dataset.src}"]`, ctx.el)?.focus({ preventScroll: true }); });
   $('#tabs', ctx.el).addEventListener('keydown', (e) => {
     if (!e.target.closest('[data-src]')) return;
     const index = tabs.findIndex((tab) => tab.id === active.id);
     const next = e.key === 'ArrowRight' ? (index + 1) % tabs.length : e.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
     if (next < 0) return;
-    e.preventDefault(); select(tabs[next]); $(`[data-src="${tabs[next].id}"]`, ctx.el)?.focus();
+    e.preventDefault(); select(tabs[next]); const button = $(`[data-src="${tabs[next].id}"]`, ctx.el); button?.focus({ preventScroll: true }); button?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   });
   $('#markbtn').addEventListener('click', () => { const on_ = toggleMark('anime', id, ep); if (on_) { const e = getEntry('anime', id); if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format }); } });
   $('#autonext').addEventListener('change', (e) => setSetting('autoNext', e.target.checked));
