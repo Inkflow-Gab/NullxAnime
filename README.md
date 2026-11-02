@@ -2,7 +2,7 @@
 
 # NullxAnime
 
-A sleek, fast **anime + manga** hub. No captcha, no ads, no account, no tracking — it's a static site (plain ES modules, **no build step**) that runs on GitHub Pages.
+A sleek, fast **anime + manga** hub. No account required and no ads added by NullxAnime; third-party players may contain ads or tracking. It's a static site (plain ES modules, **no build step**) that runs on GitHub Pages.
 
 **Live:** https://inkflow-gab.github.io/NullxAnime/ (after the first deploy — see [Deploy](#deploy))
 
@@ -58,3 +58,11 @@ tests/                static server, API mocks, e2e
 ## Credits
 
 [Cinzel](https://github.com/google/fonts/tree/main/ofl/cinzel) (SIL Open Font License 1.1; see `assets/fonts/OFL-Cinzel.txt`); AniList, MangaDex and the Internet Archive for their open APIs; [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0, vendored in `vendor/`). All anime, manga and artwork belong to their owners — please support official releases.
+
+### Device and player notes
+
+The layout adapts to the viewport and touch input. Recognizable TV user agents enable remote navigation automatically; Settings can override TV mode. Detection is local and best-effort, not a guarantee for every device. The watch page includes episode filtering, retry, and share-link controls.
+
+The optional Senshi tab retrieves available Senshi/StreamNin/FileMoon mirrors from the updated separately deployed worker using the title's MyAnimeList ID. Availability, embedding, audio, ads and permissions depend on each external provider; no provider backend is hosted by GitHub Pages. See [provider notes](docs/PROVIDERS.md) for what is and is not implemented.
+
+**More servers** can discover Kitsune-compatible providers and mirrors from a separately hosted API. It does not provide or deploy that API and does not make all upstream servers ready by itself. Third-party streams may require unavailable headers or be blocked. See [provider notes](docs/PROVIDERS.md).

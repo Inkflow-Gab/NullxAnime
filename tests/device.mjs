@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { detectDevice } from '../js/ui/device.js';
+assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (SMART-TV; Tizen 7.0)' }), 'tv');
+assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (Linux; Android 12; Mobile)' }), 'phone');
+assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (iPad)' }), 'tablet');
+assert.equal(detectDevice({ userAgent: 'Windows NT 10.0' }), 'desktop');
+assert.equal(detectDevice({ coarse: true, width: 390 }), 'phone');
+assert.equal(detectDevice({ coarse: true, width: 800 }), 'tablet');
+assert.equal(detectDevice({ width: 390, coarse: false }), 'desktop');
+console.log('Device detection checks passed');

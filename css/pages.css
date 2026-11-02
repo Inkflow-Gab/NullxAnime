@@ -336,3 +336,12 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .instant-panel .instant-help { flex-basis: 100%; font-size: 13px; line-height: 1.5; }
 .instant-panel .instant-help a { color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
 .instant-panel .seg button { min-height: 42px; padding-inline: 18px; }
+
+/* Watch controls adapt to long titles, touch input and large-screen remotes. */
+.episode-filter { padding: 0 12px 10px; }
+.episode-filter .input { min-height: 42px; }
+.episode-filter #episode-results:not(:empty) { display: block; margin: 5px 2px 0; font-size: 12px; }
+.watch-page .stage-wrap { border-radius: var(--radius); box-shadow: 0 0 0 1px rgba(var(--accent-rgb), .16), 0 18px 50px rgba(0, 0, 0, .25); overflow: hidden; }
+.watch-page .source-tabs .chip.active { box-shadow: 0 0 18px rgba(var(--accent-rgb), .22); }
+@media (pointer: coarse) { .watch-page .ep-row { min-height: 44px; } .watch-page .source-tabs .chip { min-height: 46px; } }
+@media (max-width: 560px) { .watch-head { flex-wrap: wrap; } .watch-head .spacer { display: none; } .watch-head > a { flex-basis: 100%; } }

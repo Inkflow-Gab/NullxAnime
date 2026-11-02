@@ -174,6 +174,27 @@ export default {
     if (typeof env.TOKEN_SECRET !== 'string' || env.TOKEN_SECRET.length < 32) return json({ error: 'Worker TOKEN_SECRET must be configured (at least 32 characters)' }, origin, 503);
     const url = new URL(request.url);
     try {
+      // Senshi episode embeds are keyed by MAL ID. Return only validated public HTTPS URLs.
+      if (url.pathname === '/senshi') {
+        const mal = Number(url.searchParams.get('mal')), episode = Number(url.searchParams.get('episode')), audio = url.searchParams.get('audio');
+        if (!Number.isSafeInteger(mal) || mal < 1 || !Number.isSafeInteger(episode) || episode < 1 || episode > 10000 || !['sub', 'dub'].includes(audio)) return json({ error: 'Invalid title, episode or audio' }, origin, 400);
+        const { response } = await upstream(`https://senshi.to/episode-embeds/${mal}/${episode}`, { headers: { Referer: 'https://senshi.to/', Accept: 'application/json', 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) });
+        if (!response.ok) throw new Error(`Senshi returned HTTP ${response.status}`);
+        const data = JSON.parse(await boundedText(response, MAX_HTML));
+        const streams = [], seen = new Set();
+        for (const entry of Array.isArray(data) ? data.slice(0, 50) : []) {
+          if ((String(entry.status || '').toLowerCase() === 'dub' ? 'dub' : 'sub') !== audio) continue;
+          for (const [name, value] of [['Senshi', entry.url], ['StreamNin', entry.server2], ['FileMoon', entry.serverFM]]) {
+            try {
+              const target = safeTarget(value).href;
+              if (seen.has(target)) continue;
+              seen.add(target);
+              streams.push({ server: name, url: target, type: /\.m3u8(?:[?#]|$)/i.test(target) ? 'hls' : /\.(?:mp4|webm)(?:[?#]|$)/i.test(target) ? 'video' : 'embed' });
+            } catch { /* ignore invalid upstream links */ }
+          }
+        }
+        return json({ streams }, origin);
+      }
       if (url.pathname === '/search') {
         const q = (url.searchParams.get('q') || '').trim();
         if (q.length < 3 || q.length > 150) return json({ error: 'Search must contain 3–150 characters' }, origin, 400);

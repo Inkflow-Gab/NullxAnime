@@ -42,6 +42,10 @@ async function mockNetwork(page) {
     const u = new URL(url);
     if (u.origin === new URL(BASE).origin) return req.continue();
     if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
+    if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/1000') return req.respond(json({ providers: { aniwaves: { episodes: { sub: [{ id: 'watch/aniwaves/1000/sub/aniwaves-1', number: 1 }] } }, senshi: { episodes: { sub: [{ id: 'watch/senshi/1000/sub/senshi-1', number: 1 }] } } } }));
+    if (u.hostname === 'kitsune-api.test' && u.pathname.startsWith('/api/watch/')) return req.respond(json({ streams: [{ server: 'First', type: 'embed', url: 'https://senshi-embed.test/one' }, { server: 'Second', type: 'embed', url: 'https://senshi-embed.test/two' }] }));
+    if (u.hostname === 'stream.test' && u.pathname === '/senshi') return req.respond(json({ streams: [{ server: 'Senshi', type: 'embed', url: 'https://senshi-embed.test/one' }, { server: 'FileMoon', type: 'embed', url: 'https://senshi-embed.test/two' }] }));
+    if (u.hostname === 'senshi-embed.test') return req.respond({ status: 200, contentType: 'text/html', body: 'Mirror mock' });
     if (u.hostname === 'stream.test' && u.pathname === '/search') return req.respond(json({ results: [{ slug: 'mock-series', title: 'Mock anime' }] }));
     if (u.hostname === 'stream.test' && u.pathname === '/series') return req.respond(json({ episodes: [{ number: 1, sub: true, dub: false }] }));
     if (u.hostname === 'stream.test' && u.pathname === '/watch') return req.respond(json({ streams: [{ url: 'https://stream.test/media?token=mock', type: 'mp4', server: 'test' }] }));
@@ -118,6 +122,16 @@ try {
     return !(await page.$eval('#markbtn', (e) => e.classList.contains('on')));
   })());
   check('watch page has episode list', (await count('.ep-row')) >= 5);
+  check('episode filter finds episode number', await (async () => {
+    await page.type('#episode-search', '3');
+    const ok = await page.$eval('.ep-row[data-ep="3"]', (e) => !e.hidden) && await page.$eval('.ep-row[data-ep="2"]', (e) => e.hidden);
+    await page.$eval('#episode-search', (e) => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    return ok;
+  })());
+  check('instant player retry remains on the episode', await (async () => {
+    await page.click('[data-instant-retry]');
+    return await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
+  })());
   check('official YouTube source remains available', await (async () => {
     await page.$eval('[data-src="yt-0"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
     await page.click('[data-src="yt-0"]');
@@ -135,6 +149,25 @@ try {
     await page.click('#animegg-play');
     await page.waitForSelector('#animegg-stream');
     return !!(await page.$('#stage video')) && (await page.$eval('#stage video', (v) => v.src)).startsWith('https://stream.test/media?');
+  })());
+  check('watch → compatible API discovers providers and mirrors', await (async () => {
+    await page.$eval('[data-src="kitsune"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
+    await page.click('[data-src="kitsune"]');
+    await page.$eval('#deployment-url', (e) => { e.value = 'https://kitsune-api.test/api'; });
+    await page.click('#kitsune-load button');
+    await page.waitForSelector('#kitsune-mirror');
+    const providers = await page.$$eval('#kitsune-provider option', (o) => o.map((v) => v.textContent));
+    await page.select('#kitsune-provider', '1');
+    await page.waitForSelector('#kitsune-mirror');
+    await page.select('#kitsune-mirror', '1');
+    return providers.includes('aniwaves') && providers.includes('senshi') && await page.$eval('#stage iframe', (e) => e.src === 'https://senshi-embed.test/two');
+  })());
+  check('watch → Senshi switches retrieved mirrors', await (async () => {
+    await page.$eval('[data-src="senshi"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
+    await page.click('[data-src="senshi"]');
+    await page.waitForSelector('#senshi-server');
+    await page.select('#senshi-server', '1');
+    return await page.$eval('#stage iframe', (e) => e.src === 'https://senshi-embed.test/two');
   })());
   check('watch → AniPub search, title and episode', await (async () => {
     await page.$eval('[data-src="anipub"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
@@ -196,15 +229,34 @@ try {
   check('settings', await visit('/settings', '.set-card', { shot: 'settings' }));
   check('settings: change accent', await (async () => { await page.click('[data-set="accent"][data-v="rose"]'); return (await page.$eval('html', (e) => e.dataset.accent)) === 'rose'; })());
   check('TV mode enables directional navigation', await (async () => {
-    await page.$eval('[data-tg="tvMode"]', (e) => e.click());
+    await page.$eval('[data-tv="on"]', (e) => e.click());
     if (!(await page.$eval('html', (e) => e.dataset.tvMode === 'on'))) return false;
     await visit('/', '.nav a[data-nav="anime"]');
     await page.focus('.nav a[data-nav="anime"]'); await page.keyboard.press('ArrowRight');
     const moved = await page.evaluate(() => document.activeElement?.dataset.nav === 'manga');
-    await visit('/settings', '[data-tg="tvMode"]');
-    await page.$eval('[data-tg="tvMode"]', (e) => e.click());
+    await visit('/settings', '[data-tv="off"]');
+    await page.$eval('[data-tv="off"]', (e) => e.click());
     return moved && (await page.$eval('html', (e) => e.dataset.tvMode === 'off'));
   })());
+  check('TV auto detection can be manually overridden', await (async () => {
+    const ua = await page.evaluate(() => navigator.userAgent);
+    await page.$eval('[data-tv="auto"]', (e) => e.click());
+    await page.setUserAgent('Mozilla/5.0 (SMART-TV; Tizen 7.0)');
+    await visit('/settings', '[data-tv="off"]');
+    const automatic = await page.$eval('html', (e) => e.dataset.device === 'tv' && e.dataset.tvMode === 'on');
+    await page.$eval('[data-tv="off"]', (e) => e.click());
+    const overridden = await page.$eval('html', (e) => e.dataset.tvMode === 'off');
+    await page.$eval('[data-tv="auto"]', (e) => e.click());
+    await page.setUserAgent(ua);
+    await visit('/settings', '[data-tv="auto"]');
+    return automatic && overridden;
+  })());
+  check('footer glitch respects reduced motion', await (async () => {
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    const result = await page.$eval('.dev-name', (e) => getComputedStyle(e, '::before').animationName === 'none');
+    await page.emulateMediaFeatures([]); return result;
+  })());
+  check('footer credits Gab accessibly', await page.$eval('.dev-signature', (e) => e.getAttribute('aria-label') === 'Developed by Gab' && e.querySelector('.dev-name')?.textContent === 'Gab'));
   check('about', await visit('/about', '.prose'));
   check('404 route', await visit('/nope', '.empty'));
 
@@ -221,6 +273,7 @@ try {
   console.log('Mobile');
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   check('mobile home + tab bar', await visit('/', '.hero-slide.active', { shot: 'mobile-home' }) && (await page.$eval('.tabbar', (e) => getComputedStyle(e).display)) === 'flex');
+  check('mobile device hint is automatic', await page.$eval('html', (e) => e.dataset.device === 'phone'));
   check('mobile detail', await visit('/anime/1002', '.detail-title', { shot: 'mobile-anime' }));
   check('no horizontal overflow on mobile', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });

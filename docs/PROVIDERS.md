@@ -24,6 +24,22 @@ GitHub Pages cannot execute the worker. To use it with Pages:
 
 The worker fetches provider HTML, issues time-limited signed URLs for sources, and proxies MP4 or HLS manifests, keys, segments and range requests. The token secret is required; arbitrary client-supplied proxy URLs are not accepted. The worker rejects literal IPs, credentials, local hostnames, non-HTTPS URLs and non-standard ports; provider pages and signed HLS manifests still determine which upstream domains it contacts. Origin checks are not authentication: configure Cloudflare access controls, rate limits and usage limits as appropriate for your deployment. Provider HTML, mirrors, CORS, URLs, availability and episode numbering can change. Some HLS formats or servers may not work; live provider access was not tested in this sandbox.
 
+### Senshi mirrors (adapted from Kitsune)
+
+The same worker exposes `/senshi?mal={id}&episode={number}&audio=sub|dub`, fetching Senshi's episode-embeds endpoint and returning validated HTTPS links for the `url`, `server2`, and `serverFM` fields (Senshi, StreamNin, and FileMoon). The watch tab looks up the title's AniList-provided MyAnimeList ID and lets users select returned mirrors. Update/redeploy the worker to use it; the repo does not include a hosted worker. Embed permissions, ads, CORS and subtitle/audio availability are controlled by the mirror. A GitHub Actions request to Senshi for a sample episode returned HTTP 403 without a CORS header; a deployed worker or other network may behave differently, but neither mirror playback nor bypass has been verified. These are embed fallbacks, not Kitsune's VidCloud stream extractor.
+
+### More servers: compatible provider API
+
+The **More servers** tab speaks the Kitsune-compatible provider API contract: `/episodes/{anilistId}`, `/watch/{provider}/{anilistId}/{sub|dub}/{provider}-{episode}`, and `/proxy`. It displays reported providers and their individual mirrors and uses the configured API's proxy for HLS/MP4. The API base must be an HTTPS URL ending in `/api`; it is stored locally in your browser. Only connect an API you trust. Nothing in this tab embeds the upstream website.
+
+The adapter recognizes all 12 providers listed below, but this repository does **not** contain or host their full server-side extractors. The API must already be separately deployed and must allow your Pages origin with CORS; its proxy and providers need their own access controls, network protections and rate limits. The upstream proxy accepts arbitrary URLs and must not be exposed publicly without hardening. Media URLs, required headers, encrypted playlists, ads and subtitles vary; this frontend forwards a referer and playlist key but not arbitrary provider headers, so some streams may fail. Provider discovery and switching are mock-tested only. Without a compatible backend, use Instant play.
+
+### Upstream coverage
+
+At Kitsune commit `cd05752f01d3365fdd5a600445703084383f3c78`, its backend lists mkissa, reanime, anikoto, animegg, animenosub, anizone, aniwaves, senshi, kaa, animedunya, animeonsen and anipm. NullxAnime implements the MegaPlay fallback, AnimeGG worker, and Senshi embed mirrors; the optional API client can discover the other providers only if a compatible backend is supplied. Their server-side extractors are **not** implemented or deployed here. They require different server-side extractors, dependencies, access and/or deployment; a static Pages site cannot run them. Mirror links are dynamic per title and episode, not a complete static list in the repository.
+
+The third inspected repository, awesome-anime-sources, is a directory rather than a player API. Its sites cannot be assumed embeddable, ad-free, licensed, or currently online; the existing Discover directory is curated rather than a copy of every link.
+
 ### AniPub
 
 AniPub's `backend/models/AniDB.js` stores the first video link and episode links in MongoDB; `views-ejs/AniPlayer.ejs` renders either an iframe or a video source. The repository does not contain that catalogue or the values of the `aniAPI` and `VIDEOAPI` deployment variables. The AniPub tab uses an AniPub deployment's search API and episode HTML, extracts the underlying player URL, and mounts that video or iframe instead of the whole AniPub page. Search or page fetch requires CORS; the source itself must allow embedding or playback. A numeric title ID can be entered manually, and an open-on-AniPub link is provided if extraction or playback fails. Episode indices on AniPub are zero-based; NullxAnime translates episode 1 to index 0.

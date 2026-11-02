@@ -16,7 +16,7 @@ export default async function about(ctx) {
     </ul>
 
     <h2>Third-party players</h2>
-    <div class="notice">${icon('shield')}<div>Instant play uses a third-party episode player; the AnimeGG worker and AniPub player use external providers and deployments. Their availability, content and playback policies depend on the provider.</div></div>
+    <div class="notice">${icon('shield')}<div>Instant play uses a third-party episode player; the AnimeGG worker, compatible provider API and AniPub player use external providers and deployments. Their availability, content and playback policies depend on the provider.</div></div>
 
     <h2>Credits &amp; sources</h2>
     <ul>
@@ -24,7 +24,7 @@ export default async function about(ctx) {
       <li><a href="https://mangadex.org" target="_blank" rel="noopener">MangaDex</a> — manga catalogue and reader images. Please respect scanlation groups and buy official releases.</li>
       <li><a href="https://archive.org" target="_blank" rel="noopener">Internet Archive</a> — open-licensed video.</li>
       <li><a href="https://github.com/video-dev/hls.js" target="_blank" rel="noopener">hls.js</a> (Apache-2.0) — HLS playback for your own streams.</li>
-      <li>Feature ideas (ad-free browsing, installable PWA, watch progress) inspired by the open-source projects <a href="https://github.com/AnimePub/AniPub" target="_blank" rel="noopener">AniPub</a> and <a href="https://github.com/Dovakiin0/Kitsune" target="_blank" rel="noopener">Kitsune</a>, and the community list <a href="https://github.com/anshumanv/awesome-anime-sources" target="_blank" rel="noopener">awesome-anime-sources</a>. The AnimeGG worker adapts Kitsune code under the MIT license; see the repository for attribution.</li>
+      <li>Feature ideas (ad-free browsing, installable PWA, watch progress) inspired by the open-source projects <a href="https://github.com/AnimePub/AniPub" target="_blank" rel="noopener">AniPub</a> and <a href="https://github.com/Dovakiin0/Kitsune" target="_blank" rel="noopener">Kitsune</a>, and the community list <a href="https://github.com/anshumanv/awesome-anime-sources" target="_blank" rel="noopener">awesome-anime-sources</a>. The AnimeGG and Senshi worker adapters are based on Kitsune under the MIT license; see the repository for attribution.</li>
     </ul>
 
     <h2>Privacy</h2>
