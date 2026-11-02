@@ -36,6 +36,13 @@ export function anipubPlayer(base, id, episode, audio = 'sub') {
   return `${baseUrl(base)}/AniPlayer/${id}/${episode - 1}?type=${audio}`;
 }
 
+// The direct AniList/episode fallback used by Kitsune's watch player.
+export const INSTANT_ORIGIN = 'https://megaplay.buzz';
+export function instantEmbed(id, episode, audio = 'sub') {
+  if (!/^\d+$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || Number(id) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid title, episode or audio.');
+  return `${INSTANT_ORIGIN}/stream/ani/${Number(id)}/${episode}/${audio}`;
+}
+
 /** Client for NullxAnime's own AnimeGG worker. */
 export function animeggSearch(base, query, signal) {
   const q = String(query || '').trim();

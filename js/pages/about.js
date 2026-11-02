@@ -15,8 +15,8 @@ export default async function about(ctx) {
       <li><b>Track everything</b> — one list for anime and manga, progress, scores, history, stats, backup and MyAnimeList/AniList XML export.</li>
     </ul>
 
-    <h2>Community deployments</h2>
-    <div class="notice">${icon('shield')}<div>The AnimeGG worker and AniPub player use external providers and deployments. Their availability, content and playback policies depend on the provider.</div></div>
+    <h2>Third-party players</h2>
+    <div class="notice">${icon('shield')}<div>Instant play uses a third-party episode player; the AnimeGG worker and AniPub player use external providers and deployments. Their availability, content and playback policies depend on the provider.</div></div>
 
     <h2>Credits &amp; sources</h2>
     <ul>
@@ -28,7 +28,7 @@ export default async function about(ctx) {
     </ul>
 
     <h2>Privacy</h2>
-    <p>NullxAnime has no analytics or account. External deployments may use cookies or analytics. Your list, history and settings are stored in your browser’s local storage. Requests go directly from your browser to AniList, MangaDex, the Internet Archive, YouTube’s privacy-enhanced player, and any community deployment you choose to connect.</p>
+    <p>NullxAnime has no analytics or account. Third-party players and external deployments may use cookies or analytics. Your list, history and settings are stored in your browser’s local storage. Requests go directly from your browser to AniList, MangaDex, the Internet Archive, YouTube’s privacy-enhanced player, the third-party Instant play provider when watching, and any community deployment you choose to connect.</p>
 
     <h2>Copyright</h2>
     <p>All anime, manga, artwork and trademarks belong to their respective owners. If you are a rights holder and have a concern, please open an issue on the <a href="https://github.com/Inkflow-Gab/NullxAnime" target="_blank" rel="noopener">GitHub repository</a>.</p>

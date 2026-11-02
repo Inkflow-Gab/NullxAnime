@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS = {
   readerFit: 'width',     // width | height | original
   readerDataSaver: false,
   autoNext: true,
+  instantAudio: 'sub',
   autoplay: true,
   reduceMotion: false,
   showCountdown: true,

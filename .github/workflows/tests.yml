@@ -20,3 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - name: Check instant provider reachability (non-blocking)
+        run: node tests/live-provider.mjs
+      - name: Probe real episode playback (non-blocking)
+        run: node tests/live-playback.mjs

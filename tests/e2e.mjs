@@ -41,6 +41,7 @@ async function mockNetwork(page) {
     const url = req.url();
     const u = new URL(url);
     if (u.origin === new URL(BASE).origin) return req.continue();
+    if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'stream.test' && u.pathname === '/search') return req.respond(json({ results: [{ slug: 'mock-series', title: 'Mock anime' }] }));
     if (u.hostname === 'stream.test' && u.pathname === '/series') return req.respond(json({ episodes: [{ number: 1, sub: true, dub: false }] }));
     if (u.hostname === 'stream.test' && u.pathname === '/watch') return req.respond(json({ streams: [{ url: 'https://stream.test/media?token=mock', type: 'mp4', server: 'test' }] }));
@@ -102,8 +103,26 @@ try {
   check('detail strips <script> from synopsis', !(await page.$eval('#desc', (e) => e.innerHTML)).includes('<script') && (await page.$eval('#desc', (e) => e.innerHTML)).includes('<i>unforgettable</i>'));
   check('detail lists episodes', (await count('.ep')) >= 5);
   check('detail has official stream links', (await count('.stream-link')) >= 2);
-  check('watch page (official youtube embed)', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }));
+  check('watch page defaults to the episode player without setup', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }) && await page.$eval('#stage iframe', (e) => e.src === 'https://megaplay.buzz/stream/ani/1000/1/sub' && !e.hasAttribute('sandbox')) && !(await page.$('#deployment-url')));
+  check('instant player remembers audio and episode', await (async () => {
+    await page.click('[data-instant-audio="dub"]');
+    const switched = await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/dub'));
+    await page.click('#next');
+    await page.waitForFunction(() => document.querySelector('#stage iframe')?.src.endsWith('/1000/2/dub'));
+    const ok = switched && (await page.$eval('[data-instant-audio="dub"]', (e) => e.getAttribute('aria-pressed') === 'true'));
+    await visit('/watch/1000/1', '#stage iframe'); await page.click('[data-instant-audio="sub"]');
+    return ok && await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
+  })());
+  check('instant player ignores messages from other windows', await (async () => {
+    await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', { origin: 'https://megaplay.buzz', source: window, data: { event: 'complete', currentTime: 60, duration: 60 } })));
+    return !(await page.$eval('#markbtn', (e) => e.classList.contains('on')));
+  })());
   check('watch page has episode list', (await count('.ep-row')) >= 5);
+  check('official YouTube source remains available', await (async () => {
+    await page.$eval('[data-src="yt-0"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
+    await page.click('[data-src="yt-0"]');
+    return (await page.$eval('#stage iframe', (e) => e.src)).startsWith('https://www.youtube-nocookie.com/embed/');
+  })());
   check('watch source tabs support keyboard navigation', await (async () => {
     await page.focus('#tabs [role="tab"][aria-selected="true"]'); await page.keyboard.press('End');
     return (await page.$eval('#tabs [data-src="mine"]', (e) => e.getAttribute('aria-selected'))) === 'true';
