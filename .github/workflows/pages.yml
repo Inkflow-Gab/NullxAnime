@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Stamp cache version
-        run: sed -i "s/nx-v1/nx-${GITHUB_SHA::7}/" sw.js
+        run: sed -i "s/const VERSION = '[^']*';/const VERSION = 'nx-${GITHUB_SHA::7}';/" sw.js
 
       - name: Assemble static site
         run: |

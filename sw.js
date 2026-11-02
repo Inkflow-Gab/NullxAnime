@@ -1,13 +1,13 @@
 // NullxAnime service worker: app-shell caching so the site opens instantly and works offline (cached pages only).
 // API calls (AniList, MangaDex, Internet Archive) and media are never cached here.
 
-const VERSION = 'nx-v1';
+const VERSION = 'nx-v2';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'css/base.css', 'css/components.css', 'css/pages.css',
   'assets/logo.svg', 'assets/icon-192.png', 'assets/icon-512.png',
   'js/main.js', 'js/router.js', 'js/util.js', 'js/store.js', 'js/cache.js', 'js/sources.js', 'js/player.js',
-  'js/api/anilist.js', 'js/api/mangadex.js', 'js/api/archive.js',
+  'js/api/anilist.js', 'js/api/community.js', 'js/api/mangadex.js', 'js/api/archive.js',
   'js/ui/icons.js', 'js/ui/components.js', 'js/ui/palette.js',
   'js/pages/home.js', 'js/pages/anime.js', 'js/pages/watch.js', 'js/pages/free.js', 'js/pages/mangaHome.js', 'js/pages/mangaDetail.js',
   'js/pages/reader.js', 'js/pages/search.js', 'js/pages/schedule.js', 'js/pages/library.js', 'js/pages/discover.js', 'js/pages/settings.js', 'js/pages/about.js',
@@ -24,7 +24,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== location.origin) return; // third-party APIs, images and video go straight to the network
+  const scopePath = new URL(self.registration.scope).pathname;
+  if (url.origin !== location.origin || url.pathname.slice(scopePath.length).startsWith('api/')) return; // API responses and third-party assets go to the network
   // stale-while-revalidate for our own static files
   e.respondWith(caches.open(VERSION).then(async (cache) => {
     const hit = await cache.match(req, { ignoreSearch: true });

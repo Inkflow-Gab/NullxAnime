@@ -5,7 +5,7 @@ export default async function about(ctx) {
   ctx.setTitle('About');
   ctx.render(html`<div class="container page narrow prose">
     <h1 class="page-title">About NullxAnime</h1>
-    <p class="lead">A sleek, fast anime &amp; manga hub with no captcha, no ads, no sign-up and no tracking. Your list lives in your own browser.</p>
+    <p class="lead">A sleek, fast anime &amp; manga hub. External deployments may have their own policies and requirements. Your list lives in your own browser.</p>
 
     <h2>What it does</h2>
     <ul>
@@ -15,8 +15,8 @@ export default async function about(ctx) {
       <li><b>Track everything</b> — one list for anime and manga, progress, scores, history, stats, backup and MyAnimeList/AniList XML export.</li>
     </ul>
 
-    <h2>What it does <u>not</u> do</h2>
-    <div class="notice warn">${icon('shield')}<div>NullxAnime does <b>not</b> host, proxy, scrape or embed pirated video. Streaming sources that require bypassing licensing, captchas or ad-networks are intentionally not included — they put creators, studios and you at risk, and they can’t be kept stable or safe. Where a title is licensed we send you to the official place to watch it; many of those are free (Muse Asia and Ani-One Asia on YouTube, ad-supported tiers, etc.).</div></div>
+    <h2>Community deployments</h2>
+    <div class="notice">${icon('shield')}<div>Optional Kitsune and AniPub connections use external deployments. Their availability, content and playback policies depend on the provider.</div></div>
 
     <h2>Credits &amp; sources</h2>
     <ul>
@@ -28,7 +28,7 @@ export default async function about(ctx) {
     </ul>
 
     <h2>Privacy</h2>
-    <p>No analytics, no cookies, no account. Your list, history and settings are stored in your browser’s local storage. Requests go directly from your browser to AniList, MangaDex, the Internet Archive, and (only when you press play) YouTube’s privacy-enhanced player.</p>
+    <p>NullxAnime has no analytics or account. External deployments may use cookies or analytics. Your list, history and settings are stored in your browser’s local storage. Requests go directly from your browser to AniList, MangaDex, the Internet Archive, YouTube’s privacy-enhanced player, and any community deployment you choose to connect.</p>
 
     <h2>Copyright</h2>
     <p>All anime, manga, artwork and trademarks belong to their respective owners. If you are a rights holder and have a concern, please open an issue on the <a href="https://github.com/Inkflow-Gab/NullxAnime" target="_blank" rel="noopener">GitHub repository</a>.</p>
