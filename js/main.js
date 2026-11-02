@@ -14,6 +14,7 @@ installTvNavigation();
 // Re-evaluate local device hints when viewport/input changes (e.g. rotation).
 window.addEventListener('resize', applySettings, { passive: true });
 window.matchMedia?.('(pointer: coarse)').addEventListener?.('change', applySettings);
+navigator.connection?.addEventListener?.('change', applySettings);
 
 const NAV = [
   ['anime', 'Anime', '#/', 'tv'],

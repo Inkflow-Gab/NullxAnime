@@ -1,6 +1,7 @@
 // Watch page — third-party episode player, official sources, personal media and community deployments.
 
 import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
+import { PROVIDER_ENDPOINTS } from '../config.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { INSTANT_ORIGIN, instantEmbed, baseUrl, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
@@ -8,8 +9,8 @@ import { kitsuneEpisodes, kitsuneChoices, kitsuneWatch, kitsuneStreams, kitsuneP
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
-import { buildSources, episodeCount, episodeLinkMap, officialSearchLinks, streamLinks, youtubeInfo, youtubeEmbed } from '../sources.js';
-import { getSettings, setSetting, getMarks, toggleMark, getEntry, saveEntry, pushHistory, getPos, setPos, getMyLink, setMyLink, subscribe } from '../store.js';
+import { buildSources, episodeCount, episodeLinkMap, officialSearchLinks, streamLinks } from '../sources.js';
+import { getSettings, setSetting, getMarks, toggleMark, getEntry, saveEntry, pushHistory, getPos, setPos, subscribe } from '../store.js';
 import { go } from '../router.js';
 
 export default async function watch(ctx) {
@@ -40,14 +41,14 @@ export default async function watch(ctx) {
   const tabs = [
     ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
     ...embeds.filter((s) => s.id !== 'trailer'),
-    { id: 'kitsune', kind: 'kitsune', label: 'More servers · setup', note: 'Compatible provider API required' },
-    { id: 'senshi', kind: 'senshi', label: 'Senshi · setup', note: 'Kitsune-derived mirrors (worker required)' },
-    { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' },
-    { id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'Connect an AniPub deployment' },
+    { id: 'mkissa', kind: 'kitsune', label: 'MKissa', note: PROVIDER_ENDPOINTS.kitsuneApi ? 'MKissa anime' : 'Currently unavailable' },
+    ...(PROVIDER_ENDPOINTS.kitsuneApi ? [{ id: 'kitsune', kind: 'kitsune', label: 'More servers', note: 'Additional provider mirrors' }] : []),
+    ...(PROVIDER_ENDPOINTS.streamWorker ? [{ id: 'senshi', kind: 'senshi', label: 'Senshi', note: 'Kitsune-derived mirrors' }, { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' }] : []),
+    ...(PROVIDER_ENDPOINTS.aniPub ? [{ id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'AniPub episode source' }] : []),
     { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
     ...embeds.filter((s) => s.id === 'trailer'),
     { id: 'library', kind: 'library', label: 'Free library', note: 'Public-domain & Creative Commons (Internet Archive)' },
-    { id: 'mine', kind: 'mine', label: 'My link / file', note: 'Play your own video' },
+    { id: 'mine', kind: 'mine', label: 'My file', note: 'Play a local video file (optional)' },
   ];
   const defaultTab = tabs.find((s) => s.id === 'instant') || embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official');
   let active = tabs.find((t) => t.id === ctx.query.src) || defaultTab;
@@ -118,7 +119,7 @@ export default async function watch(ctx) {
     }
     return now;
   };
-  const sourceQuery = () => ['animegg', 'anipub', 'senshi', 'kitsune'].includes(active.id) ? `?src=${active.id}` : '';
+  const sourceQuery = () => ['animegg', 'anipub', 'senshi', 'kitsune', 'mkissa'].includes(active.id) ? `?src=${active.id}` : '';
   const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`); };
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
@@ -164,7 +165,7 @@ export default async function watch(ctx) {
     else if (tab.kind === 'services') servicesView();
     else if (tab.kind === 'library') libraryView();
     else if (tab.kind === 'mine') mineView();
-    else if (tab.kind === 'kitsune') kitsuneView();
+    else if (tab.kind === 'kitsune') kitsuneView(tab.id === 'mkissa' ? 'mkissa' : '');
     else if (tab.kind === 'senshi') senshiView();
     else if (tab.kind === 'animegg') animeggView();
     else if (tab.kind === 'anipub') anipubView();
@@ -216,27 +217,25 @@ export default async function watch(ctx) {
   }
 
   /* ----- External deployments ----- */
-  const deploymentKey = (name) => name === 'AnimeGG' ? 'streamWorkerUrl' : name === 'Kitsune API' ? 'kitsuneApiUrl' : 'anipubUrl';
-  function deploymentForm(name, defaultUrl = '') {
-    const saved = getSettings()[deploymentKey(name)] || defaultUrl;
-    return html`<form id="deployment-form" class="mine-form glass">
-      <label class="field">${name === 'AnimeGG' ? 'Streaming worker URL' : name === 'Kitsune API' ? 'Provider API base URL' : 'AniPub deployment URL'}<input id="deployment-url" class="input" type="url" required value="${saved}" placeholder="${name === 'AnimeGG' ? 'https://your-worker.workers.dev' : name === 'Kitsune API' ? 'https://your-provider.example/api' : 'https://your-deployment.example'}"></label>
-      <div class="row"><button class="btn primary">Connect</button><button type="button" class="btn" id="deployment-forget">Forget URL</button><span class="muted">Stored in this browser. HTTPS and cross-origin access are required.</span></div>
-    </form><div id="deployment-results" aria-live="polite"></div>`;
-  }
+  const deploymentResults = () => html`<div id="deployment-results" aria-live="polite"></div>`;
   function deploymentError(error) {
     if (error.name === 'AbortError' || !ctx.alive()) return;
     const box = $('#deployment-results', panel);
     if (box) render(box, html`<div class="notice" role="alert">${error.message || 'Could not load this source.'}</div>`);
   }
   /* The optional API returns per-title provider availability and per-episode mirrors. */
-  function kitsuneView() {
-    placeholder('film', 'More servers', 'Connect a compatible provider API to look up this episode.');
-    render(panel, html`${deploymentForm('Kitsune API')}<form id="kitsune-load" class="mine-form glass"><div><b>Kitsune-compatible providers</b><p class="muted">Optional: a separately hosted provider API is required. Availability, ads and CORS depend on each provider. Instant play still needs no setup.</p></div><label class="field">Audio<select id="kitsune-audio" class="select"><option value="sub" ${getSettings().kitsuneAudio !== 'dub' ? 'selected' : ''}>Sub</option><option value="dub" ${getSettings().kitsuneAudio === 'dub' ? 'selected' : ''}>Dub</option></select></label><button class="btn primary">Find episode ${ep} servers</button><div id="kitsune-results" aria-live="polite"></div></form>`);
+  function kitsuneView(preferredProvider = '') {
+    if (!PROVIDER_ENDPOINTS.kitsuneApi) {
+      placeholder('film', 'MKissa is unavailable', 'The MKissa server is not connected yet. Use Instant play or another available source.');
+      render(panel, html`<div class="notice" role="status">MKissa needs a server operated by NullxAnime; there is no link for you to enter. <button class="btn sm" id="use-instant">Use Instant play</button></div>`);
+      $('#use-instant', panel)?.addEventListener('click', () => select(tabs.find((tab) => tab.id === 'instant') || defaultTab));
+      return;
+    }
+    placeholder('film', preferredProvider ? 'MKissa anime' : 'More servers', 'Looking up this episode.');
+    render(panel, html`<form id="kitsune-load" class="mine-form glass"><div><b>${preferredProvider ? 'MKissa anime' : 'Kitsune-compatible providers'}</b><p class="muted">Availability, ads and playback depend on each provider.</p></div><label class="field">Audio<select id="kitsune-audio" class="select"><option value="sub" ${getSettings().kitsuneAudio !== 'dub' ? 'selected' : ''}>Sub</option><option value="dub" ${getSettings().kitsuneAudio === 'dub' ? 'selected' : ''}>Dub</option></select></label><button class="btn primary">Find episode ${ep} servers</button><div id="kitsune-results" aria-live="polite"></div></form>`);
     const controller = sourceController;
     const current = () => ctx.alive() && active.kind === 'kitsune' && !controller.signal.aborted;
     let serial = 0, choices = [], base = '';
-    $('#deployment-forget', panel).addEventListener('click', () => { setSetting('kitsuneApiUrl', ''); select(active); });
     const loadProvider = async () => {
       const task = ++serial;
       const choice = choices[Number($('#kitsune-provider', panel)?.value)];
@@ -262,37 +261,42 @@ export default async function watch(ctx) {
       event.preventDefault();
       const task = ++serial;
       try {
-        base = baseUrl($('#deployment-url', panel).value);
+        base = baseUrl(PROVIDER_ENDPOINTS.kitsuneApi);
         const audio = $('#kitsune-audio', panel).value;
-        setSetting('kitsuneApiUrl', base); setSetting('kitsuneAudio', audio);
+        setSetting('kitsuneAudio', audio);
         render($('#kitsune-results', panel), html`<p class="muted">Finding available providers…</p>`);
-        const data = await kitsuneEpisodes(base, id, controller.signal);
+        const data = await kitsuneEpisodes(base, id, controller.signal, preferredProvider);
         if (!current() || task !== serial) return;
         choices = kitsuneChoices(data, id, ep, audio);
-        if (!choices.length) throw new Error('No providers reported this episode and audio. Try another audio or Instant play.');
+        if (preferredProvider) choices = choices.filter((choice) => choice.name === preferredProvider);
+        if (!choices.length) {
+          if (preferredProvider && data[preferredProvider]?.error) {
+            const message = String(data[preferredProvider].error);
+            if (/\bcaptcha\b/i.test(message)) throw new Error('MKissa requires a security check. Complete it with the provider and try again, or use another source.');
+            throw new Error(`MKissa is unavailable: ${message.slice(0, 160)}`);
+          }
+          throw new Error('No providers reported this episode and audio. Try another audio or Instant play.');
+        }
         render($('#kitsune-results', panel), html`<label class="field">Provider<select class="select" id="kitsune-provider">${choices.map((choice, i) => html`<option value="${i}">${choice.name}</option>`)}</select></label><div id="kitsune-streams" aria-live="polite"></div>`);
         $('#kitsune-provider', panel).addEventListener('change', loadProvider);
         await loadProvider();
       } catch (error) { if (current() && task === serial && error.name !== 'AbortError') render($('#kitsune-results', panel), html`<p role="alert">${error.message}</p>`); }
     };
-    $('#deployment-form', panel).addEventListener('submit', load);
     $('#kitsune-load', panel).addEventListener('submit', load);
-    if (getSettings().kitsuneApiUrl) $('#kitsune-load', panel).requestSubmit();
+    $('#kitsune-load', panel).requestSubmit();
   }
   function senshiView() {
-    placeholder('film', 'Senshi mirrors', 'Load available mirrors for this episode through your streaming worker.');
-    render(panel, html`${deploymentForm('AnimeGG')}<form id="senshi-load" class="mine-form glass"><div><b>Senshi mirrors</b><p class="muted">Uses the title’s MyAnimeList ID. External mirrors may show ads or block embedding. Requires an updated, separately deployed worker.</p></div><label class="field">Audio<select class="select" id="senshi-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn primary" ${m.idMal ? '' : 'disabled'}>Load episode ${ep} servers</button>${m.idMal ? '' : html`<p role="alert">No MyAnimeList ID is available for this title.</p>`}<div id="senshi-streams" aria-live="polite"></div></form>`);
+    placeholder('film', 'Senshi mirrors', 'Load available mirrors for this episode.');
+    render(panel, html`${deploymentResults()}<form id="senshi-load" class="mine-form glass"><div><b>Senshi mirrors</b><p class="muted">Uses the title’s MyAnimeList ID. External mirrors may show ads or block embedding. Server availability varies.</p></div><label class="field">Audio<select class="select" id="senshi-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn primary" ${m.idMal ? '' : 'disabled'}>Load episode ${ep} servers</button>${m.idMal ? '' : html`<p role="alert">No MyAnimeList ID is available for this title.</p>`}<div id="senshi-streams" aria-live="polite"></div></form>`);
     const controller = sourceController;
     const current = () => ctx.alive() && active.kind === 'senshi' && !controller.signal.aborted;
     let serial = 0;
-    $('#deployment-forget', panel).addEventListener('click', () => { setSetting('streamWorkerUrl', ''); select(active); });
     const load = async (event) => {
       event.preventDefault();
       const task = ++serial;
       try {
         if (!m.idMal) throw new Error('This title has no MyAnimeList ID.');
-        const base = baseUrl($('#deployment-url', panel).value);
-        setSetting('streamWorkerUrl', base);
+        const base = baseUrl(PROVIDER_ENDPOINTS.streamWorker);
         render($('#senshi-streams', panel), html`<p class="muted">Finding mirrors…</p>`);
         const data = await senshiWatch(base, m.idMal, ep, $('#senshi-audio', panel).value, controller.signal);
         if (!current() || task !== serial) return;
@@ -313,23 +317,20 @@ export default async function watch(ctx) {
         $('#senshi-server', panel).addEventListener('change', play); play();
       } catch (error) { if (current() && task === serial && error.name !== 'AbortError') render($('#senshi-streams', panel), html`<p role="alert">${error.message}</p>`); }
     };
-    $('#deployment-form', panel).addEventListener('submit', load);
     $('#senshi-load', panel).addEventListener('submit', load);
-    if (getSettings().streamWorkerUrl && m.idMal) $('#senshi-load', panel).requestSubmit();
+    if (m.idMal) $('#senshi-load', panel).requestSubmit();
   }
   function animeggView() {
-    placeholder('film', 'AnimeGG', 'Search for this title using your NullxAnime streaming worker.');
-    render(panel, html`${deploymentForm('AnimeGG')}<form id="animegg-search" class="mine-form glass"><label class="field">Title<input class="input" id="animegg-query" value="${item.title}" required minlength="3" maxlength="150"></label><button class="btn primary">${icon('search')} Search provider</button><p class="muted">Select the exact series and season. The worker must be deployed separately; GitHub Pages is static.</p></form>`);
+    placeholder('film', 'AnimeGG', 'Search for this title.');
+    render(panel, html`${deploymentResults()}<form id="animegg-search" class="mine-form glass"><label class="field">Title<input class="input" id="animegg-query" value="${item.title}" required minlength="3" maxlength="150"></label><button class="btn primary">${icon('search')} Search provider</button><p class="muted">Select the exact series and season.</p></form>`);
     const controller = sourceController;
     const current = () => ctx.alive() && active.kind === 'animegg' && !controller.signal.aborted;
     let serial = 0;
-    $('#deployment-forget', panel).addEventListener('click', () => { setSetting(deploymentKey('AnimeGG'), ''); select(active); });
     const search = async (event) => {
       event.preventDefault();
       const task = ++serial;
       try {
-        const base = baseUrl($('#deployment-url', panel).value);
-        setSetting(deploymentKey('AnimeGG'), base);
+        const base = baseUrl(PROVIDER_ENDPOINTS.streamWorker);
         placeholder('film', 'AnimeGG', 'Searching the provider…');
         render($('#deployment-results', panel), html`<p class="muted">Searching…</p>`);
         const data = await animeggSearch(base, $('#animegg-query', panel).value, controller.signal);
@@ -362,25 +363,22 @@ export default async function watch(ctx) {
             play();
           } catch (error) { if (current() && playTask === serial && error.name !== 'AbortError') { placeholder('film', 'Episode unavailable', 'Try another title, audio, or provider.'); render($('#animegg-streams', panel), html`<p role="alert">${error.message}</p>`); } }
         });
-      } catch (error) { if (current() && task === serial && error.name !== 'AbortError') { placeholder('film', 'Search unavailable', 'Check the worker URL and try again.'); deploymentError(error); } }
+      } catch (error) { if (current() && task === serial && error.name !== 'AbortError') { placeholder('film', 'Search unavailable', 'Try another source or try again later.'); deploymentError(error); } }
     };
-    $('#deployment-form', panel).addEventListener('submit', search);
     $('#animegg-search', panel).addEventListener('submit', search);
-    if (getSettings()[deploymentKey('AnimeGG')]) $('#animegg-search', panel).requestSubmit();
+    $('#animegg-search', panel).requestSubmit();
   }
   function anipubView() {
     placeholder('film', 'AniPub', 'Search the AniPub catalogue and select the matching title.');
-    render(panel, html`${deploymentForm('AniPub', 'https://anipub.org')}<form id="anipub-search" class="mine-form glass"><label class="field">Title<input class="input" id="anipub-query" value="${item.title}" required></label><button class="btn">${icon('search')} Search AniPub</button></form><form id="anipub-manual" class="mine-form glass"><label class="field">AniPub title ID (if search is blocked)<input id="anipub-id" class="input" inputmode="numeric" pattern="[0-9]+" required></label><label class="field">Audio<select class="select" id="anipub-manual-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn">Open episode ${ep}</button><div id="anipub-manual-link"></div></form>`);
+    render(panel, html`${deploymentResults()}<form id="anipub-search" class="mine-form glass"><label class="field">Title<input class="input" id="anipub-query" value="${item.title}" required></label><button class="btn">${icon('search')} Search AniPub</button></form>`);
     const controller = sourceController;
     const current = () => ctx.alive() && active.kind === 'anipub' && !controller.signal.aborted;
     let lookupSerial = 0;
-    $('#deployment-forget', panel).addEventListener('click', () => { setSetting(deploymentKey('AniPub'), ''); select(active); });
     const search = async (event) => {
       event.preventDefault();
       const lookup = ++lookupSerial;
       try {
-        const base = baseUrl($('#deployment-url', panel).value);
-        setSetting(deploymentKey('AniPub'), base);
+        const base = baseUrl(PROVIDER_ENDPOINTS.aniPub);
         render($('#deployment-results', panel), html`<p class="muted">Searching AniPub…</p>`);
         const results = await anipubSearch(base, $('#anipub-query', panel).value, controller.signal);
         if (!current() || lookup !== lookupSerial) return;
@@ -390,7 +388,6 @@ export default async function watch(ctx) {
 
       } catch (error) { if (current() && lookup === lookupSerial) deploymentError(error); }
     };
-    $('#deployment-form', panel).addEventListener('submit', search);
     $('#anipub-search', panel).addEventListener('submit', search);
     async function playAniPub(base, titleId, audio, box) {
       const task = ++lookupSerial;
@@ -406,14 +403,7 @@ export default async function watch(ctx) {
         if (current() && task === lookupSerial && error.name !== 'AbortError') render(box, html`<p role="alert">${error.message} <a href="${page}" target="_blank" rel="noopener noreferrer">Open on AniPub</a>.</p>`);
       }
     }
-    $('#anipub-manual', panel).addEventListener('submit', (event) => {
-      event.preventDefault();
-      try {
-        const base = baseUrl($('#deployment-url', panel).value);
-        setSetting(deploymentKey('AniPub'), base);
-        playAniPub(base, $('#anipub-id', panel).value, $('#anipub-manual-audio', panel).value, $('#anipub-manual-link', panel));
-      } catch (error) { deploymentError(error); }
-    });
+
   }
 
   /* ----- Official services launch pad ----- */
@@ -473,53 +463,33 @@ export default async function watch(ctx) {
     });
   }
 
-  /* ----- My link / local file ----- */
+  /* ----- Optional local file ----- */
   function mineView() {
-    placeholder('link', 'Play your own video', 'Paste a direct video link (MP4, WebM, HLS .m3u8) or a YouTube link — or pick a file from your device. Only use content you have the right to watch.');
-    const saved = getMyLink(id, ep);
-    render(panel, html`<form id="mineform" class="mine-form glass">
-      <label class="field">Video link<input class="input" id="mineurl" type="url" placeholder="https://… .mp4 / .m3u8 / youtube.com/watch?v=…" value="${saved?.url || ''}"></label>
-      <label class="field">Subtitles link (optional, .vtt or .srt)<input class="input" id="minesub" type="url" placeholder="https://… .vtt" value="${saved?.sub || ''}"></label>
-      <div class="row"><button class="btn primary">${icon('play')} Play link</button>${saved ? html`<button type="button" class="btn danger" id="minedel">${icon('trash')} Forget link</button>` : ''}
-        <span class="spacer"></span>
-        <label class="btn" style="cursor:pointer">${icon('file')} Choose local file<input id="minefile" type="file" accept="video/*,.mkv,.m3u8" hidden></label>
-        <label class="btn ghost" style="cursor:pointer">${icon('file')} Subtitle file<input id="minesubfile" type="file" accept=".vtt,.srt" hidden></label></div>
-      <p class="muted" style="font-size:12.5px">Links are saved only in this browser, per episode. Some hosts block playback on other websites — that is the host’s choice.</p>
-    </form>`);
+    placeholder('file', 'Play a local video', 'Choose a video from your device. Only use content you have the right to watch.');
+    render(panel, html`<div class="mine-form glass"><div class="row">
+      <label class="btn primary" style="cursor:pointer">${icon('file')} Choose local file<input id="minefile" type="file" accept="video/*,.mkv,.m3u8" hidden></label>
+      <label class="btn ghost" style="cursor:pointer">${icon('file')} Subtitle file<input id="minesubfile" type="file" accept=".vtt,.srt" hidden></label>
+    </div><p class="muted">Files stay on your device.</p></div>`);
     let subBlob = '';
-    const playUrl = (url, sub) => {
-      const yt = youtubeInfo(url);
-      if (yt) { mountEmbed(youtubeEmbed(yt), 'My video'); return; }
-      mountPlayer({ src: url, subtitle: sub || undefined, label: 'My video', poster: item.cover, autoplay: true });
-    };
-    $('#mineform').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const url = safeUrl($('#mineurl').value.trim());
-      if (!url) { toast('Enter a valid http(s) link', 'err'); return; }
-      const sub = safeUrl($('#minesub').value.trim());
-      setMyLink(id, ep, { url, sub });
-      playUrl(url, sub);
-      stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-    $('#minedel')?.addEventListener('click', () => { setMyLink(id, ep, null); mineView(); toast('Link forgotten'); });
-    $('#minefile').addEventListener('change', (e) => {
+    ctx.cleanup(() => { if (subBlob) URL.revokeObjectURL(subBlob); });
+    $('#minefile', panel).addEventListener('change', (e) => {
       const f = e.target.files[0]; if (!f) return;
       const url = URL.createObjectURL(f);
       ctx.cleanup(() => URL.revokeObjectURL(url));
       mountPlayer({ src: url, subtitle: subBlob || undefined, label: f.name, autoplay: true });
       if (/\.mkv$/i.test(f.name)) toast('MKV support depends on your browser — MP4/WebM is the safest.');
     });
-    $('#minesubfile').addEventListener('change', async (e) => {
+    $('#minesubfile', panel).addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
       const { srtToVtt } = await import('../player.js');
       let text = await f.text();
       if (/\.srt$/i.test(f.name)) text = srtToVtt(text);
+      if (subBlob) URL.revokeObjectURL(subBlob);
       subBlob = URL.createObjectURL(new Blob([text], { type: 'text/vtt' }));
       const v = $('video', stage);
       if (v) { const tr = document.createElement('track'); tr.kind = 'subtitles'; tr.label = f.name; tr.src = subBlob; tr.default = true; v.appendChild(tr); toast('Subtitles loaded'); }
       else toast('Subtitles will load with the next video');
     });
-    if (saved?.url) playUrl(saved.url, saved.sub);
   }
 
   /* ---------- events ---------- */

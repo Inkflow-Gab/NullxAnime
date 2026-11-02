@@ -1,4 +1,4 @@
-import { currentDevice } from './ui/device.js';
+import { currentDevice, useLightweightEffects } from './ui/device.js';
 
 // Local-first persistence. Everything lives in the browser's localStorage under the `nx:` prefix,
 // so there are no accounts, no captcha and no server. Export / import JSON from Settings.
@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS = {
   kitsuneAudio: 'sub',
   autoplay: true,
   reduceMotion: false,
+  performanceMode: 'auto', // auto | on | off
   showCountdown: true,
   tvMode: null,           // null = auto; true / false = manual override
 };
@@ -46,6 +47,8 @@ export function applySettings() {
   r.dataset.accent = settings.accent;
   const device = currentDevice();
   r.dataset.device = device;
+  const lightweight = settings.performanceMode === 'on' || (settings.performanceMode !== 'off' && useLightweightEffects({ device, memory: navigator.deviceMemory, saveData: navigator.connection?.saveData }));
+  r.dataset.performance = lightweight ? 'on' : 'off';
   r.dataset.tvMode = (settings.tvMode == null ? device === 'tv' : settings.tvMode === true) ? 'on' : 'off';
   r.classList.toggle('reduce-motion', !!settings.reduceMotion);
   const tc = { dark: '#0b0b12', oled: '#000000', light: '#f4f4fa' }[settings.theme] || '#0b0b12';

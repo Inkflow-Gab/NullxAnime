@@ -11,3 +11,8 @@ export function detectDevice({ userAgent = '', width = 1024, coarse = false } = 
 export function currentDevice() {
   return detectDevice({ userAgent: navigator.userAgent, width: window.innerWidth, coarse: window.matchMedia?.('(pointer: coarse)').matches });
 }
+
+// Conservative hints only; device detection is local and never uploaded.
+export function useLightweightEffects({ device = 'desktop', memory, saveData = false } = {}) {
+  return device === 'phone' || device === 'tv' || saveData || (Number.isFinite(memory) && memory > 0 && memory <= 4);
+}

@@ -20,9 +20,9 @@ export default async function mangaHomePage(ctx) {
   const hist = getHistory('manga').slice(0, 14);
   ctx.render(html`<div class="container page" style="padding-top:18px">
     ${feat.length ? html`<section class="mhero" id="mhero">${feat.map((it, i) => html`<div class="mhero-slide ${i === 0 ? 'active' : ''}">
-      <img class="mhero-bg" src="${it.cover}" alt="" referrerpolicy="no-referrer">
+      <img class="mhero-bg" ${i === 0 ? html`src="${it.cover}" fetchpriority="high"` : html`data-hero-src="${it.cover}"`} alt="" referrerpolicy="no-referrer">
       <div class="mhero-inner">
-        <img class="mhero-cover" src="${it.cover}" alt="" referrerpolicy="no-referrer">
+        <img class="mhero-cover" ${i === 0 ? html`src="${it.cover}"` : html`data-hero-src="${it.cover}"`} alt="" referrerpolicy="no-referrer">
         <div class="mhero-text">
           <div class="chips"><span class="badge accent">${icon('flame')} #${i + 1} Popular</span>${it.origin !== 'Manga' ? html`<span class="badge">${it.origin}</span>` : ''}${it.raw.status ? html`<span class="badge">${titleCase(it.raw.status)}</span>` : ''}</div>
           <h1>${it.title}</h1>
@@ -55,7 +55,7 @@ export default async function mangaHomePage(ctx) {
   if (hero) {
     const slides = $$('.mhero-slide', hero), dots = $$('[data-dot]', hero);
     let i = 0, t;
-    const show = (n) => { i = (n + slides.length) % slides.length; slides.forEach((s, k) => s.classList.toggle('active', k === i)); dots.forEach((d, k) => d.classList.toggle('on', k === i)); };
+    const show = (n) => { i = (n + slides.length) % slides.length; slides[i].querySelectorAll('[data-hero-src]').forEach((img) => { img.src = img.dataset.heroSrc; delete img.dataset.heroSrc; }); slides.forEach((s, k) => s.classList.toggle('active', k === i)); dots.forEach((d, k) => d.classList.toggle('on', k === i)); };
     const play = () => { clearInterval(t); if (!getSettings().reduceMotion) t = setInterval(() => { if (!document.hidden) show(i + 1); }, 9000); };
     hero.addEventListener('click', (e) => { const d = e.target.closest('[data-dot]'); if (d) { show(Number(d.dataset.dot)); play(); } });
     hero.addEventListener('mouseenter', () => clearInterval(t)); hero.addEventListener('mouseleave', play);

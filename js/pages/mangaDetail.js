@@ -1,6 +1,6 @@
 // Manga detail page with chapter list.
 
-import { html, render, $, $$, on, cleanMarkdown, titleCase, copyText, timeAgo, fmtNum, hashQuery, safeUrl } from '../util.js';
+import { html, render, $, $$, on, debounce, cleanMarkdown, titleCase, copyText, timeAgo, fmtNum, hashQuery, safeUrl } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mangaDetail, chapterFeed, LANGS } from '../api/mangadex.js';
 import { fromManga, toast, errorBox, setStatus, PLACEHOLDER } from '../ui/components.js';
@@ -109,22 +109,28 @@ export default async function mangaDetailPage(ctx) {
       ${list.length > 600 ? html`<p class="muted" style="margin-top:12px">Showing 600 of ${list.length}. Use the filter to jump to a chapter.</p>` : ''}`;
   }
 
+  const updateChapters = debounce(() => { const list = $('#chlist', ctx.el); if (ctx.alive() && list) render(list, chapterList()); }, 120);
+  let bindController;
+  ctx.cleanup(() => { bindController?.abort(); updateChapters.cancel(); });
   const draw = () => { ctx.render(head()); bind(); };
   function bind() {
+    bindController?.abort();
+    bindController = new AbortController();
+    const signal = bindController.signal;
     const root = ctx.el;
     $('[data-more]', root)?.addEventListener('click', (e) => { $('#desc', root).classList.remove('collapsed'); e.target.remove(); });
     $('[data-share]', root)?.addEventListener('click', () => copyText(location.href).then(() => toast('Link copied')));
     $('#lang', root)?.addEventListener('change', (e) => { lang = e.target.value; loadChapters(); });
     $('#sort', root)?.addEventListener('click', () => { sortDesc = !sortDesc; draw(); });
     $('#markall', root)?.addEventListener('click', () => { if (!chapters?.length) return; setMarks('manga', id, chapters.map((c) => c.id)); toast('Marked all chapters as read'); });
-    $('#chfilter', root)?.addEventListener('input', (e) => { filter = e.target.value; render($('#chlist', root), chapterList()); });
-    on(root, 'click', '[data-read]', (e, t) => { e.preventDefault(); e.stopPropagation(); toggleMark('manga', id, t.dataset.read); });
+    $('#chfilter', root)?.addEventListener('input', (e) => { filter = e.target.value; updateChapters(); });
+    on(root, 'click', '[data-read]', (e, t) => { e.preventDefault(); e.stopPropagation(); toggleMark('manga', id, t.dataset.read); }, { signal });
     on(root, 'change', '[data-track]', (e, t) => {
       const base = { title: item.title, cover: item.cover, total: item.total, format: item.origin };
       if (t.dataset.track === 'status') setStatus(item, t.value);
       if (t.dataset.track === 'score') saveEntry('manga', id, { score: Number(t.value) }, base);
       if (t.dataset.track === 'progress') saveEntry('manga', id, { progress: Math.max(0, Number(t.value) || 0) }, base);
-    });
+    }, { signal });
   }
   async function loadChapters() {
     chapters = null; chError = null; draw();
