@@ -26,7 +26,7 @@ export function srtToVtt(srt) {
 }
 
 export function createPlayer(host, opts = {}) {
-  const { src, poster, subtitle, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
+  const { src, poster, subtitle, format, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
   host.innerHTML = html`<div class="vp" tabindex="0" aria-label="${label || 'Video player'}">
     <video playsinline preload="metadata" ${poster ? html`poster="${poster}"` : ''}></video>
     <div class="vp-center"><button class="vp-bigplay" aria-label="Play">${icon('play')}</button><div class="spinner vp-spin" hidden></div></div>
@@ -67,7 +67,7 @@ export function createPlayer(host, opts = {}) {
   /* ----- source ----- */
   (async () => {
     try {
-      if (isHls(src)) {
+      if (format === 'hls' || isHls(src)) {
         if (v.canPlayType('application/vnd.apple.mpegurl')) v.src = src;
         else {
           const Hls = await loadHls();

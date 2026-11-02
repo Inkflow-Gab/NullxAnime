@@ -30,6 +30,10 @@ async function mockNetwork(page) {
     const url = req.url();
     const u = new URL(url);
     if (u.origin === new URL(BASE).origin) return req.continue();
+    if (u.hostname === 'kitsune.test' && u.pathname === '/api/episodes/1000') return req.respond(json({ providers: { anikoto: { episodes: { sub: [{ number: 1, id: 'watch/anikoto/1000/sub/anikoto-1' }], dub: [{ number: 1, id: 'watch/anikoto/1000/dub/anikoto-1' }] } } } }));
+    if (u.hostname === 'kitsune.test' && u.pathname.startsWith('/api/watch/')) return req.respond(json({ streams: [{ url: 'https://video.test/episode.mp4', type: 'mp4', server: 'test' }] }));
+    if (u.hostname === 'anipub.test' && u.pathname.startsWith('/api/search/')) return req.respond(json([{ Name: 'Mock anime', Id: 42 }]));
+    if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>AniPub mock</body></html>' });
     if (u.hostname === 'graphql.anilist.co') return req.respond(json(anilist(req.postData() || '{}')));
     if (u.hostname === 'api.mangadex.org') return req.respond(json(mangadex(url)));
     if (u.hostname === 'archive.org' && !u.pathname.startsWith('/download') && !u.pathname.startsWith('/services')) return req.respond(json(archive(url)));
@@ -69,6 +73,11 @@ try {
 
   console.log('Anime');
   check('home renders hero + rails', await visit('/', '.hero-slide.active', { shot: 'home' }) && (await count('.rail .card')) > 30);
+  check('hero watch action links to the episode', (await page.$eval('.hero-slide.active .hero-actions a', (e) => e.getAttribute('href'))).startsWith('#/watch/'));
+  check('hero tabs support keyboard navigation', await (async () => {
+    await page.focus('#hero [data-dot="0"]'); await page.keyboard.press('ArrowRight');
+    return (await page.$eval('#hero [data-dot="1"]', (e) => e.getAttribute('aria-selected'))) === 'true' && (await page.$eval('.hero-slide.active', (e) => e.dataset.i)) === '1';
+  })());
   check('ranking: top 10 with big numerals right under the hero', (await count('#rank-track .rank-item')) === 10 && (await page.$eval('.hero + .container > .ranking', () => true).catch(() => false)));
   check('ranking tabs switch lists', await (async () => { const a = await text('#rank-track .card .title'); await page.click('[data-rank="top"]'); await new Promise((r) => setTimeout(r, 200)); return (await count('#rank-track .rank-item')) === 10 && a.length > 0; })());
   check('recently updated links straight to the episode', await (async () => { await page.waitForSelector('#recent .card', { timeout: 5000 }); return (await page.$eval('#recent .card .poster', (e) => e.getAttribute('href'))).startsWith('#/watch/'); })());
@@ -81,6 +90,25 @@ try {
   check('detail has official stream links', (await count('.stream-link')) >= 2);
   check('watch page (official youtube embed)', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }));
   check('watch page has episode list', (await count('.ep-row')) >= 5);
+  check('watch source tabs support keyboard navigation', await (async () => {
+    await page.focus('#tabs [role="tab"][aria-selected="true"]'); await page.keyboard.press('End');
+    return (await page.$eval('#tabs [data-src="mine"]', (e) => e.getAttribute('aria-selected'))) === 'true';
+  })());
+  check('watch → Kitsune episode and stream', await (async () => {
+    await page.click('[data-src="kitsune"]');
+    await page.$eval('#deployment-url', (e) => { e.value = 'https://kitsune.test'; });
+    await page.click('#deployment-form button');
+    await page.waitForSelector('#kitsune-stream');
+    return (await count('#kitsune-provider option')) === 2 && !!(await page.$('#stage video')) && (await page.$eval('#stage video', (v) => v.src)).includes('/api/proxy?');
+  })());
+  check('watch → AniPub search, title and episode', await (async () => {
+    await page.click('[data-src="anipub"]');
+    await page.$eval('#deployment-url', (e) => { e.value = 'https://anipub.test'; });
+    await page.click('#anipub-search button');
+    await page.waitForSelector('#anipub-play');
+    await page.click('#anipub-play');
+    return (await page.$eval('#stage iframe', (f) => f.src)).includes('/AniPlayer/42/0?type=sub') && !!(await page.$('#anipub-link a'));
+  })());
   check('watch → official services tab', await (async () => { await page.click('[data-src="official"]'); await page.waitForSelector('.launchpad'); return true; })());
   await page.screenshot({ path: SHOTS ? new URL('./__screens__/watch-official.png', import.meta.url).pathname : '/dev/null' }).catch(() => {});
   check('watch → free library tab lists results', await (async () => { await page.click('[data-src="library"]'); await page.waitForSelector('.lib-item', { timeout: 6000 }); return true; })());

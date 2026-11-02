@@ -69,14 +69,14 @@ function heroSection(items) {
           <div class="hero-meta">${meta.map((x, k) => html`${k ? html`<i></i>` : ''}<span>${x}</span>`)}</div>
           <p class="hero-desc clamp-3">${plain(m.description)}</p>
           <div class="row hero-actions">
-            <a class="btn primary lg" href="${it.href}">${icon('play')} Watch now</a>
+            <a class="btn primary lg" href="#/watch/${it.id}/1">${icon('play')} Watch now</a>
             <a class="btn ghost lg" href="${it.href}">${icon('info')} Details</a>
             <button class="btn ghost lg" data-action="lib-menu" data-key="anime:${it.id}" aria-label="Add to my list">${icon('plus')} My list</button>
           </div>
         </div>
       </div>`;
     })}
-    <div class="hero-dots" role="tablist">${items.map((_, i) => html`<button role="tab" data-dot="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Slide ${i + 1}"></button>`)}</div>
+    <div class="hero-dots" role="tablist">${items.map((_, i) => html`<button role="tab" data-dot="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Slide ${i + 1}" aria-selected="${i === 0 ? 'true' : 'false'}" tabindex="${i === 0 ? '0' : '-1'}"></button>`)}</div>
   </section>`;
 }
 
@@ -88,12 +88,20 @@ function startHero(ctx) {
   const show = (n) => {
     i = (n + slides.length) % slides.length;
     slides.forEach((s, k) => { s.classList.toggle('active', k === i); s.setAttribute('aria-hidden', k === i ? 'false' : 'true'); });
-    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    dots.forEach((d, k) => { d.classList.toggle('on', k === i); d.setAttribute('aria-selected', String(k === i)); d.tabIndex = k === i ? 0 : -1; });
   };
   const play = () => { stop(); if (!getSettings().reduceMotion && slides.length > 1) timer = setInterval(() => { if (!document.hidden) show(i + 1); }, 8000); };
   const stop = () => clearInterval(timer);
   hero.addEventListener('click', (e) => { const d = e.target.closest('[data-dot]'); if (d) { show(Number(d.dataset.dot)); play(); } });
-  hero.addEventListener('mouseenter', stop); hero.addEventListener('mouseleave', play);
+  hero.addEventListener('keydown', (e) => {
+    if (!e.target.closest('[data-dot]')) return;
+    const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? slides.length - 1 : null;
+    if (next === null) return;
+    e.preventDefault(); show(next); stop(); dots[i].focus();
+  });
+  hero.addEventListener('mouseenter', stop); hero.addEventListener('mouseleave', () => { if (!hero.contains(document.activeElement)) play(); });
+  hero.addEventListener('focusin', stop);
+  hero.addEventListener('focusout', (e) => { if (!hero.contains(e.relatedTarget)) play(); });
   let sx = 0;
   hero.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; stop(); }, { passive: true });
   hero.addEventListener('touchend', (e) => { const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) show(i + (dx < 0 ? 1 : -1)); play(); }, { passive: true });

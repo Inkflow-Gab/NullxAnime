@@ -1,9 +1,9 @@
-// Watch page — plays only legal sources: official YouTube streams, trailers, the Internet Archive's open library,
-// and your own links/files. Official services (Crunchyroll, Netflix, ...) are surfaced as launch links.
+// Watch page — official sources, personal media and optional community deployments.
 
 import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
+import { baseUrl, kitsuneEpisodes, episodeOptions, kitsuneWatch, kitsuneStreams, kitsuneProxy, anipubSearch, anipubPlayer } from '../api/community.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
@@ -38,13 +38,15 @@ export default async function watch(ctx) {
   const hasOfficial = streamLinks(m).length > 0 || !!epInfo;
   const tabs = [
     ...embeds.filter((s) => s.id !== 'trailer'),
+    { id: 'kitsune', kind: 'kitsune', label: 'Kitsune', note: 'Connect your Kitsune deployment' },
+    { id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'Connect an AniPub deployment' },
     { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
     ...embeds.filter((s) => s.id === 'trailer'),
     { id: 'library', kind: 'library', label: 'Free library', note: 'Public-domain & Creative Commons (Internet Archive)' },
     { id: 'mine', kind: 'mine', label: 'My link / file', note: 'Play your own video' },
   ];
-  let active = tabs.find((t) => t.id === ctx.query.src) || (embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official'));
-  const defaultTab = active;
+  const defaultTab = embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official');
+  let active = tabs.find((t) => t.id === ctx.query.src) || defaultTab;
   let player = null;
   const killPlayer = () => { player?.destroy(); player = null; };
   ctx.cleanup(killPlayer);
@@ -99,7 +101,7 @@ export default async function watch(ctx) {
   paintEpisodes();
   $('#eplist .current')?.scrollIntoView({ block: 'center' });
 
-  const paintTabs = () => render($('#tabs'), tabs.map((t) => html`<button role="tab" class="chip ${t.id === active.id ? 'active' : ''}" data-src="${t.id}" title="${t.note || ''}">${t.kind === 'embed' && t.id !== 'trailer' ? icon('play') : t.kind === 'services' ? icon('globe') : t.kind === 'library' ? icon('film') : t.kind === 'mine' ? icon('link') : icon('film')} ${t.label}</button>`));
+  const paintTabs = () => render($('#tabs'), tabs.map((t) => html`<button role="tab" aria-selected="${t.id === active.id ? 'true' : 'false'}" tabindex="${t.id === active.id ? '0' : '-1'}" class="chip ${t.id === active.id ? 'active' : ''}" data-src="${t.id}" title="${t.note || ''}">${t.kind === 'embed' && t.id !== 'trailer' ? icon('play') : t.kind === 'services' ? icon('globe') : t.kind === 'library' ? icon('film') : t.kind === 'mine' ? icon('link') : icon('film')} ${t.label}</button>`));
 
   /* ---------- progress / completion ---------- */
   const markWatched = (force) => {
@@ -111,24 +113,25 @@ export default async function watch(ctx) {
     }
     return now;
   };
-  const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}`); };
+  const sourceQuery = () => ['kitsune', 'anipub'].includes(active.id) ? `?src=${active.id}` : '';
+  const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`); };
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
   /* ---------- stage rendering ---------- */
-  function mountPlayer({ src, subtitle, label, poster, autoplay = false }) {
+  function mountPlayer({ src, subtitle, format, label, poster, autoplay = false }) {
     killPlayer();
     stage.className = 'stage';
     player = createPlayer(stage, {
-      src, subtitle, poster, label, autoplay,
+      src, subtitle, format, poster, label, autoplay,
       startAt: getPos(posKey)?.pos || 0,
       onProgress: (pos, dur) => { setPos(posKey, pos, dur); if (dur && pos / dur > 0.9) toggleMark('anime', id, ep, true); },
       onEnded,
     });
   }
-  function mountEmbed(src, title) {
+  function mountEmbed(src, title, sandbox = false) {
     killPlayer();
     stage.className = 'stage';
-    stage.innerHTML = `<div class="video-frame"><iframe src="${esc(src)}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+    stage.innerHTML = `<div class="video-frame"><iframe src="${esc(src)}" title="${esc(title)}" ${sandbox ? 'sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"' : ''} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
   }
   function placeholder(iconName, title, text) {
     killPlayer();
@@ -136,9 +139,17 @@ export default async function watch(ctx) {
     render(stage, html`<div class="stage-msg">${icon(iconName)}<h3>${title}</h3><p>${text}</p></div>`);
   }
 
+  let sourceController = null;
+  ctx.cleanup(() => sourceController?.abort());
   async function select(tab) {
+    sourceController?.abort();
+    sourceController = new AbortController();
     active = tab;
     paintTabs();
+    const suffix = sourceQuery();
+    $('#prev').setAttribute('href', `#/watch/${id}/${ep - 1}${suffix}`);
+    $('#next').setAttribute('href', `#/watch/${id}/${ep + 1}${suffix}`);
+    $$('.ep-row', ctx.el).forEach((row) => row.setAttribute('href', `#/watch/${id}/${row.dataset.ep}${suffix}`));
     render(panel, '');
     history.replaceState(null, '', `#/watch/${id}/${ep}${tab.id !== defaultTab.id ? `?src=${tab.id}` : ''}`);
     if (tab.kind === 'embed') {
@@ -147,6 +158,113 @@ export default async function watch(ctx) {
     } else if (tab.kind === 'services') servicesView();
     else if (tab.kind === 'library') libraryView();
     else if (tab.kind === 'mine') mineView();
+    else if (tab.kind === 'kitsune') kitsuneView();
+    else if (tab.kind === 'anipub') anipubView();
+  }
+
+  /* ----- External deployments ----- */
+  const deploymentKey = (name) => name === 'Kitsune' ? 'kitsuneUrl' : 'anipubUrl';
+  function deploymentForm(name, defaultUrl = '') {
+    const saved = getSettings()[deploymentKey(name)] || defaultUrl;
+    return html`<form id="deployment-form" class="mine-form glass">
+      <label class="field">${name} deployment URL<input id="deployment-url" class="input" type="url" required value="${saved}" placeholder="https://your-deployment.example"></label>
+      <div class="row"><button class="btn primary">Connect</button><button type="button" class="btn" id="deployment-forget">Forget URL</button><span class="muted">Stored in this browser. HTTPS and cross-origin access are required.</span></div>
+    </form><div id="deployment-results" aria-live="polite"></div>`;
+  }
+  function deploymentError(error) {
+    if (error.name === 'AbortError' || !ctx.alive()) return;
+    const box = $('#deployment-results', panel);
+    if (box) render(box, html`<div class="notice" role="alert">${error.message || 'Could not load this source.'}</div>`);
+  }
+  function kitsuneView() {
+    placeholder('film', 'Kitsune', 'Connect a running Kitsune deployment to load its episode sources.');
+    render(panel, deploymentForm('Kitsune', 'https://kitsunee.moe'));
+    const controller = sourceController;
+    const current = () => ctx.alive() && active.kind === 'kitsune' && !controller.signal.aborted;
+    let lookupSerial = 0;
+    $('#deployment-forget', panel).addEventListener('click', () => { setSetting(deploymentKey('Kitsune'), ''); select(active); });
+    $('#deployment-form', panel).addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const lookup = ++lookupSerial;
+      try {
+        const base = baseUrl($('#deployment-url', panel).value);
+        setSetting(deploymentKey('Kitsune'), base);
+        placeholder('film', 'Kitsune', 'Looking for episode sources…');
+        render($('#deployment-results', panel), html`<p class="muted">Looking for episode sources…</p>`);
+        const data = await kitsuneEpisodes(base, id, controller.signal);
+        if (!current() || lookup !== lookupSerial) return;
+        const options = episodeOptions(data, ep);
+        if (!options.length) throw new Error('No Kitsune provider has this episode.');
+        render($('#deployment-results', panel), html`<label class="field">Provider and audio<select class="select" id="kitsune-provider">${options.map((o, i) => html`<option value="${i}">${o.provider} · ${o.audio.toUpperCase()}</option>`)}</select></label><div id="kitsune-streams"></div>`);
+        let request = 0;
+        const load = async () => {
+          const serial = ++request;
+          try {
+            const choice = options[Number($('#kitsune-provider', panel).value)];
+            placeholder('film', 'Kitsune', 'Loading the selected provider…');
+            render($('#kitsune-streams', panel), html`<p class="muted">Loading streams…</p>`);
+            const result = await kitsuneWatch(base, choice.path, controller.signal);
+            if (!current() || lookup !== lookupSerial || serial !== request) return;
+            const streams = kitsuneStreams(result);
+            if (!streams.length) throw new Error('No playable streams for this provider. Try another.');
+            render($('#kitsune-streams', panel), html`<label class="field">Stream<select class="select" id="kitsune-stream">${streams.map((s, i) => html`<option value="${i}">${s.server || 'Stream'}${s.quality ? ` · ${s.quality}` : ''}</option>`)}</select></label><p class="muted">Playback uses the configured Kitsune deployment’s proxy.</p>`);
+            const play = () => {
+              const source = streams[Number($('#kitsune-stream', panel).value)];
+              const subs = [...(Array.isArray(result.subtitles) ? result.subtitles : []), ...(Array.isArray(source.subtitles) ? source.subtitles : [])];
+              const sub = subs.find((x) => x.default && (x.file || x.url)) || subs.find((x) => (x.file || x.url) && x.kind !== 'thumbnails');
+              const subUrl = sub?.file || sub?.url || '';
+              const subtitle = subUrl ? kitsuneProxy(base, subUrl, source) + (/\.srt(?:[?#]|$)/i.test(subUrl) ? '#subtitle.srt' : '') : '';
+              mountPlayer({ src: kitsuneProxy(base, source.url, source), subtitle, format: /^(hls|m3u8)$/i.test(source.type || '') || /\.m3u8(?:[?#]|$)/i.test(source.url) ? 'hls' : undefined, label: `${item.title} · ${choice.provider}`, poster: item.cover, autoplay: true });
+            };
+            $('#kitsune-stream', panel).addEventListener('change', play);
+            play();
+          } catch (error) {
+            if (current() && lookup === lookupSerial && serial === request) render($('#kitsune-streams', panel), html`<p role="alert">${error.message}</p>`);
+          }
+        };
+        $('#kitsune-provider', panel).addEventListener('change', load);
+        load();
+      } catch (error) { if (current() && lookup === lookupSerial) deploymentError(error); }
+    });
+    $('#deployment-form', panel).requestSubmit();
+  }
+  function anipubView() {
+    placeholder('film', 'AniPub', 'Search the AniPub catalogue and select the matching title.');
+    render(panel, html`${deploymentForm('AniPub', 'https://anipub.org')}<form id="anipub-search" class="mine-form glass"><label class="field">Title<input class="input" id="anipub-query" value="${item.title}" required></label><button class="btn">${icon('search')} Search AniPub</button></form><form id="anipub-manual" class="mine-form glass"><label class="field">AniPub title ID (if search is blocked)<input id="anipub-id" class="input" inputmode="numeric" pattern="[0-9]+" required></label><label class="field">Audio<select class="select" id="anipub-manual-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn">Open episode ${ep}</button><div id="anipub-manual-link"></div></form>`);
+    const controller = sourceController;
+    const current = () => ctx.alive() && active.kind === 'anipub' && !controller.signal.aborted;
+    let lookupSerial = 0;
+    $('#deployment-forget', panel).addEventListener('click', () => { setSetting(deploymentKey('AniPub'), ''); select(active); });
+    const search = async (event) => {
+      event.preventDefault();
+      const lookup = ++lookupSerial;
+      try {
+        const base = baseUrl($('#deployment-url', panel).value);
+        setSetting(deploymentKey('AniPub'), base);
+        render($('#deployment-results', panel), html`<p class="muted">Searching AniPub…</p>`);
+        const results = await anipubSearch(base, $('#anipub-query', panel).value, controller.signal);
+        if (!current() || lookup !== lookupSerial) return;
+        if (!results.length) throw new Error('No matching titles found. Try another title.');
+        render($('#deployment-results', panel), html`<label class="field">Choose the matching title<select class="select" id="anipub-title">${results.map((r) => html`<option value="${r.Id}">${r.Name}</option>`)}</select></label><label class="field">Audio<select class="select" id="anipub-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn primary" id="anipub-play">${icon('play')} Open episode ${ep}</button><div id="anipub-link"></div>`);
+        $('#anipub-play', panel).addEventListener('click', () => {
+          const url = anipubPlayer(base, $('#anipub-title', panel).value, ep, $('#anipub-audio', panel).value);
+          mountEmbed(url, 'AniPub player', true);
+          render($('#anipub-link', panel), html`<p class="muted">If embedding is blocked, <a href="${url}" target="_blank" rel="noopener noreferrer">open this episode on AniPub</a>.</p>`);
+        });
+      } catch (error) { if (current() && lookup === lookupSerial) deploymentError(error); }
+    };
+    $('#deployment-form', panel).addEventListener('submit', search);
+    $('#anipub-search', panel).addEventListener('submit', search);
+    $('#anipub-manual', panel).addEventListener('submit', (event) => {
+      event.preventDefault();
+      try {
+        const base = baseUrl($('#deployment-url', panel).value);
+        setSetting(deploymentKey('AniPub'), base);
+        const url = anipubPlayer(base, $('#anipub-id', panel).value, ep, $('#anipub-manual-audio', panel).value);
+        mountEmbed(url, 'AniPub player', true);
+        render($('#anipub-manual-link', panel), html`<p class="muted">If embedding is blocked, <a href="${url}" target="_blank" rel="noopener noreferrer">open this episode on AniPub</a>.</p>`);
+      } catch (error) { deploymentError(error); }
+    });
   }
 
   /* ----- Official services launch pad ----- */
@@ -256,14 +374,21 @@ export default async function watch(ctx) {
   }
 
   /* ---------- events ---------- */
-  on(ctx.el, 'click', '[data-src]', (e, t) => select(tabs.find((x) => x.id === t.dataset.src)));
+  on(ctx.el, 'click', '[data-src]', (e, t) => { select(tabs.find((x) => x.id === t.dataset.src)); $(`[data-src="${t.dataset.src}"]`, ctx.el)?.focus(); });
+  $('#tabs', ctx.el).addEventListener('keydown', (e) => {
+    if (!e.target.closest('[data-src]')) return;
+    const index = tabs.findIndex((tab) => tab.id === active.id);
+    const next = e.key === 'ArrowRight' ? (index + 1) % tabs.length : e.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+    if (next < 0) return;
+    e.preventDefault(); select(tabs[next]); $(`[data-src="${tabs[next].id}"]`, ctx.el)?.focus();
+  });
   $('#markbtn').addEventListener('click', () => { const on_ = toggleMark('anime', id, ep); if (on_) { const e = getEntry('anime', id); if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format }); } });
   $('#autonext').addEventListener('change', (e) => setSetting('autoNext', e.target.checked));
   $('#jump')?.addEventListener('change', (e) => { const n = clamp(parseInt(e.target.value, 10) || 1, 1, count); $(`.ep-row[data-ep="${n}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
   const onKey = (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key.toLowerCase() === 'n' && ep < count) go(`/watch/${id}/${ep + 1}`);
-    if (e.key.toLowerCase() === 'p' && ep > 1) go(`/watch/${id}/${ep - 1}`);
+    if (e.key.toLowerCase() === 'n' && ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`);
+    if (e.key.toLowerCase() === 'p' && ep > 1) go(`/watch/${id}/${ep - 1}${sourceQuery()}`);
   };
   document.addEventListener('keydown', onKey);
   ctx.cleanup(() => document.removeEventListener('keydown', onKey));
