@@ -119,6 +119,8 @@ try {
   })());
   check('watch → AniPub search, title and episode', await (async () => {
     await page.click('[data-src="anipub"]');
+    try { await page.waitForSelector('#anipub-search', { timeout: 2000 }); }
+    catch { throw new Error(`AniPub tab did not open; active=${await page.$eval('#tabs [aria-selected="true"]', (e) => e.dataset.src)}; page errors=${errors.join(' | ')}`); }
     await page.$eval('#deployment-url', (e) => { e.value = 'https://anipub.test'; });
     await page.click('#anipub-search button');
     await page.waitForSelector('#anipub-play');

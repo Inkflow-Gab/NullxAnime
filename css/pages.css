@@ -306,8 +306,7 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 /* Gothic accents without sacrificing the readability of anime titles and metadata. */
 .page-title, .section-head h2 { font-family: 'Cinzel', Georgia, serif; letter-spacing: .01em; }
 .section-head h2::before { content: '✦'; color: var(--accent); font-family: Georgia, serif; font-size: .55em; margin-right: .65em; vertical-align: .15em; }
-.watch-page .source-tabs { scroll-snap-type: x proximity; }
-.watch-page .source-tabs .chip { scroll-snap-align: start; min-height: 42px; }
+.watch-page .source-tabs .chip { min-height: 42px; }
 @media (max-width: 720px) {
   .hero { height: min(78svh, 700px); min-height: 460px; }
   .hero-content { gap: 11px; padding-bottom: 64px; }
