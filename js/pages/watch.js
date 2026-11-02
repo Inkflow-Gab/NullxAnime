@@ -1,9 +1,9 @@
-// Watch page — official sources, personal media and optional community deployments.
+// Watch page — third-party episode player, official sources, personal media and community deployments.
 
 import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
-import { baseUrl, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
+import { INSTANT_ORIGIN, instantEmbed, baseUrl, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
@@ -37,6 +37,7 @@ export default async function watch(ctx) {
   const embeds = buildSources(m, ep);
   const hasOfficial = streamLinks(m).length > 0 || !!epInfo;
   const tabs = [
+    ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
     ...embeds.filter((s) => s.id !== 'trailer'),
     { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' },
     { id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'Connect an AniPub deployment' },
@@ -45,7 +46,7 @@ export default async function watch(ctx) {
     { id: 'library', kind: 'library', label: 'Free library', note: 'Public-domain & Creative Commons (Internet Archive)' },
     { id: 'mine', kind: 'mine', label: 'My link / file', note: 'Play your own video' },
   ];
-  const defaultTab = embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official');
+  const defaultTab = tabs.find((s) => s.id === 'instant') || embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official');
   let active = tabs.find((t) => t.id === ctx.query.src) || defaultTab;
   let player = null;
   const killPlayer = () => { player?.destroy(); player = null; };
@@ -155,11 +156,53 @@ export default async function watch(ctx) {
     if (tab.kind === 'embed') {
       mountEmbed(tab.src, tab.label);
       render(panel, html`<div class="notice">${icon('info')}<div>${tab.id === 'trailer' ? 'This is the official trailer / promo video.' : html`<b>${tab.label}</b> — an official free channel. Pick the episode inside the YouTube player; use <b>Mark watched</b> above to track progress.`}${tab.url ? html` <a href="${tab.url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Open on YouTube ${icon('ext')}</a>` : ''}</div></div>`);
-    } else if (tab.kind === 'services') servicesView();
+    } else if (tab.kind === 'instant') instantView();
+    else if (tab.kind === 'services') servicesView();
     else if (tab.kind === 'library') libraryView();
     else if (tab.kind === 'mine') mineView();
     else if (tab.kind === 'animegg') animeggView();
     else if (tab.kind === 'anipub') anipubView();
+  }
+
+  /* ----- Direct episode player (Kitsune's iframe fallback) ----- */
+  function instantView() {
+    let audio = getSettings().instantAudio === 'dub' ? 'dub' : 'sub';
+    let lastProgress = 0, completed = false;
+    const drawPlayer = () => {
+      completed = false; lastProgress = 0;
+      const src = instantEmbed(id, ep, audio);
+      mountEmbed(src, `${item.title} — ${epLabel}`, true);
+      render(panel, html`<div class="instant-panel glass">
+        <div><b>Instant play</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
+        <div class="seg" aria-label="Audio language"><button type="button" data-instant-audio="sub" class="${audio === 'sub' ? 'on' : ''}" aria-pressed="${audio === 'sub'}">Sub</button><button type="button" data-instant-audio="dub" class="${audio === 'dub' ? 'on' : ''}" aria-pressed="${audio === 'dub'}">Dub</button></div>
+        <p class="muted instant-help">No video link needed. Availability depends on the provider and your region. If playback is blocked or this episode is missing, try the other source tabs. <a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a></p>
+      </div>`);
+    };
+    drawPlayer();
+    panel.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-instant-audio]');
+      if (!button || active.kind !== 'instant') return;
+      audio = button.dataset.instantAudio;
+      setSetting('instantAudio', audio);
+      drawPlayer();
+    }, { signal: sourceController.signal });
+    const onMessage = (event) => {
+      const frame = $('iframe', stage);
+      if (active.kind !== 'instant' || event.origin !== INSTANT_ORIGIN || !frame || event.source !== frame.contentWindow) return;
+      let data = event.data;
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch { return; } }
+      if (!data || typeof data !== 'object') return;
+      const time = typeof data.currentTime === 'number' ? data.currentTime : data.time;
+      const duration = data.duration;
+      if (!Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0 || duration > 86400 || time < 0 || time > duration + 1) return;
+      if (Math.abs(time - lastProgress) >= 10 || data.event === 'complete') {
+        lastProgress = time;
+        setPos(posKey, Math.min(time, duration), duration);
+        if (time / duration > .9) toggleMark('anime', id, ep, true);
+      }
+      if (data.event === 'complete' && !completed) { completed = true; onEnded(); }
+    };
+    window.addEventListener('message', onMessage, { signal: sourceController.signal });
   }
 
   /* ----- External deployments ----- */

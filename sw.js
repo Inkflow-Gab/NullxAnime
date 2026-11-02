@@ -1,7 +1,7 @@
 // NullxAnime service worker: app-shell caching so the site opens instantly and works offline (cached pages only).
 // API calls (AniList, MangaDex, Internet Archive) and media are never cached here.
 
-const VERSION = 'nx-v4';
+const VERSION = 'nx-v5';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'css/base.css', 'css/components.css', 'css/pages.css',

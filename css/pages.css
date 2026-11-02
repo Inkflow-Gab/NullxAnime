@@ -329,3 +329,10 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 @media (prefers-reduced-motion: reduce) {
   .hero-bg, .hero-slide, .hero-slide .hero-content > * { transition-duration: .001ms; }
 }
+
+/* Direct player controls remain usable on touch and small screens. */
+.instant-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; padding: 16px 18px; }
+.instant-panel > div:first-child { flex: 1 1 160px; }
+.instant-panel .instant-help { flex-basis: 100%; font-size: 13px; line-height: 1.5; }
+.instant-panel .instant-help a { color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
+.instant-panel .seg button { min-height: 42px; padding-inline: 18px; }

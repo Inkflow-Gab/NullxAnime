@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
-import { baseUrl, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
+import { baseUrl, instantEmbed, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
 
+assert.equal(instantEmbed(154587, 2), 'https://megaplay.buzz/stream/ani/154587/2/sub');
+assert.equal(instantEmbed('154587', 2, 'dub'), 'https://megaplay.buzz/stream/ani/154587/2/dub');
+for (const args of [['../1', 1], [0, 1], [1, -1], [1, 1, 'raw'], [1, 1.5]]) assert.throws(() => instantEmbed(...args));
 assert.equal(baseUrl('https://example.org/root/'), 'https://example.org/root');
 for (const bad of ['http://example.org', 'https://a:b@example.org', 'javascript:alert(1)', 'https://example.org/?secret=x']) assert.throws(() => baseUrl(bad));
 assert.throws(() => animeggEpisodes('https://example.org', '../private'));

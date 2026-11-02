@@ -20,3 +20,5 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - name: Check instant provider reachability (non-blocking)
+        run: node tests/live-provider.mjs

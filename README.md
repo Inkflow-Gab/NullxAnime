@@ -20,7 +20,7 @@ A sleek, fast **anime + manga** hub. No captcha, no ads, no account, no tracking
 
 ## Community streaming
 
-The AnimeGG tab uses provider logic adapted from [Kitsune](https://github.com/Dovakiin0/Kitsune): search for a series, select the exact season and audio, and play its episode through a small **NullxAnime streaming worker**. GitHub Pages only hosts the frontend: the worker must be deployed separately over HTTPS before this tab works. It is not connected to Kitsune's hosted site.
+The watch page starts with **Instant play**, a direct episode embed using the same fallback endpoint as Kitsune. No server URL is required, but the provider may be unavailable, block embedding or lack a particular episode. The AnimeGG tab uses provider logic adapted from [Kitsune](https://github.com/Dovakiin0/Kitsune): search for a series, select the exact season and audio, and play its episode through a small **NullxAnime streaming worker**. GitHub Pages only hosts the frontend: the worker must be deployed separately over HTTPS before this tab works. It is not connected to Kitsune's hosted site.
 
 The AniPub tab searches [AniPub](https://github.com/AnimePub/AniPub)'s catalogue and extracts the video or iframe source from its episode page, rather than embedding the entire page. AniPub's episode links are stored in its MongoDB database, not in its repository; this tab still needs access to an AniPub deployment. CORS or source-host restrictions may prevent playback.
 

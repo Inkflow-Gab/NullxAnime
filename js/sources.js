@@ -1,4 +1,4 @@
-// "Where can I watch this?" — everything here is LEGAL:
+// Official and user-supplied source helpers (other player integrations live in watch.js):
 //   1. Official links AniList lists for a title (Crunchyroll, Netflix, Muse Asia, ... — YouTube ones play inline)
 //   2. Official trailers / PVs
 //   3. The Internet Archive's public-domain / Creative-Commons library
