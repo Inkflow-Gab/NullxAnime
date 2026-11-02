@@ -302,3 +302,30 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .rank-item:nth-child(-n+3) .rank-n { -webkit-text-stroke-color: var(--accent-2); }
 .rank-item .card { position: relative; z-index: 1; }
 @media (max-width: 640px) { .rank-track { grid-auto-columns: 168px !important; } .rank-item { padding-left: 50px; } .rank-n { font-size: 78px; bottom: 30px; } }
+
+/* Gothic accents without sacrificing the readability of anime titles and metadata. */
+.page-title, .section-head h2 { font-family: 'Cinzel', Georgia, serif; letter-spacing: .01em; }
+.section-head h2::before { content: '✦'; color: var(--accent); font-family: Georgia, serif; font-size: .55em; margin-right: .65em; vertical-align: .15em; }
+.watch-page .source-tabs .chip { min-height: 42px; }
+@media (max-width: 720px) {
+  .hero { height: min(78svh, 700px); min-height: 460px; }
+  .hero-content { gap: 11px; padding-bottom: 64px; }
+  .hero-title { font-size: clamp(30px, 9vw, 45px); }
+  .hero-dots button { min-width: 18px; height: 12px; }
+  .hero-dots button.on { min-width: 36px; }
+  .quick-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile { padding: 12px; gap: 9px; }
+  .tile-ic { width: 36px; height: 36px; }
+  .tile small { line-height: 1.3; }
+  .watch-head { flex-wrap: wrap; }
+  .watch-head > a { min-width: 0; max-width: 100%; overflow: hidden; }
+  .watch-bar .row { flex-wrap: wrap; }
+  .watch-side { max-height: 330px; }
+}
+@media (max-width: 360px) {
+  .quick-tiles { grid-template-columns: 1fr; }
+  .hero-actions { gap: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg, .hero-slide, .hero-slide .hero-content > * { transition-duration: .001ms; }
+}

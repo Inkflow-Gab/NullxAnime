@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   autoplay: true,
   reduceMotion: false,
   showCountdown: true,
+  tvMode: false,
 };
 let settings = { ...DEFAULT_SETTINGS, ...read('settings', {}) };
 export const getSettings = () => settings;
@@ -39,6 +40,7 @@ export function applySettings() {
   const r = document.documentElement;
   r.dataset.theme = settings.theme;
   r.dataset.accent = settings.accent;
+  r.dataset.tvMode = settings.tvMode ? 'on' : 'off';
   r.classList.toggle('reduce-motion', !!settings.reduceMotion);
   const tc = { dark: '#0b0b12', oled: '#000000', light: '#f4f4fa' }[settings.theme] || '#0b0b12';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tc);

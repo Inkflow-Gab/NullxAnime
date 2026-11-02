@@ -6,9 +6,11 @@ import { applySettings, getSettings, setSetting } from './store.js';
 import { bindGlobalUi, toast } from './ui/components.js';
 import { openPalette, setPaletteType } from './ui/palette.js';
 import { startRouter, onRoute, go, reload } from './router.js';
+import { installTvNavigation } from './ui/tv.js';
 
 applySettings();
 bindGlobalUi();
+installTvNavigation();
 
 const NAV = [
   ['anime', 'Anime', '#/', 'tv'],
@@ -20,7 +22,7 @@ const NAV = [
 
 function drawShell() {
   render($('#topbar'), html`
-    <a class="brand" href="#/" aria-label="NullxAnime home"><img src="assets/logo.svg" alt="" width="32" height="32"><span>Nullx<b>Anime</b></span></a>
+    <a class="brand" href="#/" aria-label="NullxAnime home"><img src="assets/icon-192.png" alt="" width="32" height="32"><span>Nullx<b>Anime</b></span></a>
     <nav class="nav" aria-label="Main">${NAV.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${label}</a>`)}</nav>
     <div class="topbar-spacer"></div>
     <div class="top-actions">
@@ -29,7 +31,7 @@ function drawShell() {
     </div>`);
   render($('#tabbar'), NAV.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${icon(ic)}<span>${label === 'My List' ? 'List' : label}</span></a>`));
   render($('#footer'), html`<div class="footer-inner">
-    <div><a class="brand" href="#/" style="margin-bottom:10px"><img src="assets/logo.svg" alt="" width="28" height="28"><span>Nullx<b>Anime</b></span></a>
+    <div><a class="brand" href="#/" style="margin-bottom:10px"><img src="assets/icon-192.png" alt="" width="28" height="28"><span>Nullx<b>Anime</b></span></a>
       <p>A fast, ad-free anime &amp; manga hub. No captcha, no account, no tracking — your list lives in your browser.</p></div>
     <div><h4>Explore</h4><ul><li><a href="#/">Anime home</a></li><li><a href="#/manga">Manga home</a></li><li><a href="#/search?type=anime">Browse anime</a></li><li><a href="#/search?type=manga">Browse manga</a></li><li><a href="#/free">Free &amp; open library</a></li></ul></div>
     <div><h4>More</h4><ul><li><a href="#/library">My list</a></li><li><a href="#/discover">Discover tools &amp; sites</a></li><li><a href="#/settings">Settings &amp; backup</a></li><li><a href="#/about">About &amp; legal</a></li><li><a href="https://github.com/Inkflow-Gab/NullxAnime" target="_blank" rel="noopener">GitHub</a></li></ul></div>

@@ -26,7 +26,7 @@ export function srtToVtt(srt) {
 }
 
 export function createPlayer(host, opts = {}) {
-  const { src, poster, subtitle, format, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
+  const { src, poster, subtitle, format, crossOrigin = false, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
   host.innerHTML = html`<div class="vp" tabindex="0" aria-label="${label || 'Video player'}">
     <video playsinline preload="metadata" ${poster ? html`poster="${poster}"` : ''}></video>
     <div class="vp-center"><button class="vp-bigplay" aria-label="Play">${icon('play')}</button><div class="spinner vp-spin" hidden></div></div>
@@ -50,6 +50,7 @@ export function createPlayer(host, opts = {}) {
 
   const root = $('.vp', host);
   const v = $('video', root);
+  if (crossOrigin) v.crossOrigin = 'anonymous';
   const range = $('.vp-range', root), volRange = $('.vp-volrange', root), time = $('.vp-time', root);
   const buf = $('.vp-buf', root), spin = $('.vp-spin', root), msg = $('.vp-msg', root), big = $('.vp-bigplay', root);
   const btn = (n) => $(`[data-c="${n}"]`, root);
@@ -146,7 +147,7 @@ export function createPlayer(host, opts = {}) {
   const skip = (s) => { v.currentTime = clamp(v.currentTime + s, 0, v.duration || 1e9); bumpControls(); };
   const fullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
-    else (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root);
+    else { const request = (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root); request?.catch?.(() => {}); }
   };
   const bumpControls = () => {
     root.classList.add('show'); clearTimeout(hideT);
@@ -181,18 +182,23 @@ export function createPlayer(host, opts = {}) {
     }
   });
   if (!document.pictureInPictureEnabled) btn('pip').hidden = true;
-  root.addEventListener('fullscreenchange', () => root.classList.toggle('is-full', document.fullscreenElement === root));
-  document.addEventListener('fullscreenchange', () => root.classList.toggle('is-full', document.fullscreenElement === root));
+  const onFullscreen = () => root.classList.toggle('is-full', document.fullscreenElement === root);
+  document.addEventListener('fullscreenchange', onFullscreen);
 
   /* keyboard — active when the player (or page body) has focus */
   const onKey = (e) => {
     const t = e.target;
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) && !t.classList.contains('vp-range') && !t.classList.contains('vp-volrange')) return;
+    if (t !== document.body && t !== root && t !== v) return;
+    if (t === document.body && document.documentElement.dataset.tvMode === 'on' && /^Arrow/.test(e.key)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (document.getElementById('palette') || document.getElementById('shortcuts')) return;
     const k = e.key.toLowerCase();
     let used = true;
-    if (k === ' ' || k === 'k') toggle();
+    if (k === ' ' || k === 'k' || k === 'mediaplaypause') toggle();
+    else if (k === 'mediaplay') v.play().catch(() => {});
+    else if (k === 'mediapause') v.pause();
+    else if (k === 'mediarewind') skip(-10);
+    else if (k === 'mediafastforward') skip(10);
     else if (k === 'arrowleft') skip(-5);
     else if (k === 'arrowright') skip(5);
     else if (k === 'j') skip(-10);
@@ -215,6 +221,7 @@ export function createPlayer(host, opts = {}) {
       destroyed = true;
       clearTimeout(hideT);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('fullscreenchange', onFullscreen);
       if (v.duration) onProgress?.(v.currentTime, v.duration);
       try { v.pause(); v.removeAttribute('src'); v.load(); } catch {}
       hls?.destroy();
