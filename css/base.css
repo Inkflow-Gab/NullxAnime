@@ -237,3 +237,16 @@ html[data-tv-mode="on"] .card .quick { opacity: 1; transform: none; }
 @keyframes gab-glitch-a { 0%, 87%, 100% { transform: translate(0); } 88%, 92% { transform: translate(-3px, 1px); } 90%, 94% { transform: translate(4px, -2px); color: #ffe25c; } }
 @keyframes gab-glitch-b { 0%, 87%, 100% { transform: translate(0); } 88%, 93% { transform: translate(3px, -1px); } 90%, 95% { transform: translate(-4px, 2px); color: #a56dff; } }
 @media (prefers-reduced-motion: reduce) { .dev-name::before, .dev-name::after { animation: none; } }
+
+/* Less compositing work on constrained devices, with a manual Settings override. */
+html[data-performance="on"] body { background-attachment: scroll; }
+html[data-performance="on"] .glass,
+html[data-performance="on"] .badge,
+html[data-performance="on"] .btn.ghost,
+html[data-performance="on"] .card .play,
+html[data-performance="on"] .reader-bar,
+html[data-performance="on"] .reader-count { backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-performance="on"] .topbar,
+html[data-performance="on"] .tabbar { backdrop-filter: none; -webkit-backdrop-filter: none; background-color: rgba(14, 14, 22, .96); }
+html[data-performance="on"] .mhero-bg,
+html[data-performance="on"] .detail-banner img.blur-cover { filter: brightness(.38); }

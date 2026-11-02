@@ -2,7 +2,7 @@
 //   1. Official links AniList lists for a title (Crunchyroll, Netflix, Muse Asia, ... — YouTube ones play inline)
 //   2. Official trailers / PVs
 //   3. The Internet Archive's public-domain / Creative-Commons library
-//   4. Your own files and links (stored only in your browser)
+//   4. An optional local file player
 // Add a new provider by returning another descriptor from `buildSources()` and teaching pages/watch.js to render its `kind`.
 
 import { safeUrl, hostOf } from './util.js';

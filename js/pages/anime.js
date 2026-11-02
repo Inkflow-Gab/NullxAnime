@@ -4,7 +4,7 @@ import { html, render, $, $$, on, cleanAniHtml, fmtFuzzyDate, fmtCountdown, fmtD
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { card, rail, fromAnime, titleOf, fmtFormat, fmtStatus, toast, skelRail, errorBox, openLibraryMenu, setStatus, PLACEHOLDER } from '../ui/components.js';
-import { getEntry, saveEntry, getMarks, toggleMark, lastHistory, subscribe, statusLabel, STATUSES } from '../store.js';
+import { getEntry, saveEntry, getMarks, toggleMark, setMarks, lastHistory, subscribe, statusLabel, STATUSES } from '../store.js';
 import { episodeCount, episodeLinkMap, streamLinks, infoLinks, trailerEmbed } from '../sources.js';
 
 export default async function anime(ctx) {
@@ -117,13 +117,20 @@ export default async function anime(ctx) {
     bind();
   };
 
+  let bindController, countdownTimer;
+  ctx.cleanup(() => { bindController?.abort(); clearInterval(countdownTimer); });
   function bind() {
+    bindController?.abort(); clearInterval(countdownTimer);
+    bindController = new AbortController();
+    const signal = bindController.signal;
     const root = ctx.el;
     $('[data-more]', root)?.addEventListener('click', (e) => { $('#desc', root).classList.remove('collapsed'); e.target.remove(); });
     $('[data-share]', root)?.addEventListener('click', () => copyText(location.href).then(() => toast('Link copied')));
     $('[data-trailer]', root)?.addEventListener('click', () => openTrailer(m));
     $('[data-markall]', root)?.addEventListener('click', () => {
-      for (let e = 1; e <= count; e++) toggleMark('anime', id, e, true);
+      const all = getMarks('anime', id);
+      for (let e = 1; e <= count; e++) all.add(e);
+      setMarks('anime', id, all);
       saveEntry('anime', id, { progress: count, status: 'completed' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
       toast('Marked everything as watched');
     });
@@ -135,12 +142,11 @@ export default async function anime(ctx) {
       if (now && (!e0 || ep > (e0.progress || 0))) {
         saveEntry('anime', id, { progress: ep, status: e0?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
       }
-    });
+    }, { signal });
     // live countdown
     const cd = $('[data-countdown]', root);
     if (cd) {
-      const t = setInterval(() => { cd.textContent = fmtCountdown(Number(cd.dataset.countdown) - Date.now() / 1000); }, 30000);
-      ctx.cleanup(() => clearInterval(t));
+      countdownTimer = setInterval(() => { cd.textContent = fmtCountdown(Number(cd.dataset.countdown) - Date.now() / 1000); }, 30000);
     }
     // tracker panel
     on(root, 'change', '[data-track]', (e, t) => {
@@ -149,12 +155,12 @@ export default async function anime(ctx) {
       if (kind === 'status') { setStatus(item, t.value); return; }
       if (kind === 'score') saveEntry('anime', id, { score: Number(t.value) }, base);
       if (kind === 'progress') saveEntry('anime', id, { progress: Math.max(0, Math.min(Number(t.value) || 0, m.episodes || 9999)) }, base);
-    });
+    }, { signal });
     on(root, 'click', '[data-step]', (e, t) => {
       const e0 = getEntry('anime', id);
       const p = Math.max(0, Math.min((e0?.progress || 0) + Number(t.dataset.step), m.episodes || 9999));
       saveEntry('anime', id, { progress: p, status: e0?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
-    });
+    }, { signal });
   }
 
   draw();

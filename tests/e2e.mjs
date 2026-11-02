@@ -35,13 +35,17 @@ async function launch() {
 
 const json = (obj) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(obj) });
 
+let mockProviderEndpoints = false;
 async function mockNetwork(page) {
   await page.setRequestInterception(true);
   page.on('request', (req) => {
     const url = req.url();
     const u = new URL(url);
+    if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && mockProviderEndpoints) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: 'https://kitsune-api.test/api', streamWorker: 'https://stream.test', aniPub: 'https://anipub.test' });" });
     if (u.origin === new URL(BASE).origin) return req.continue();
     if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
+    if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/mkissa/1000') return req.respond(json({ providers: { mkissa: { episodes: { sub: [{ id: 'watch/mkissa/1000/sub/mkissa-1', number: 1 }] } } } }));
+    if (u.hostname === 'kitsune-api.test' && u.pathname.startsWith('/api/watch/mkissa/')) return req.respond(json({ sources: [{ name: 'Ok', type: 'iframe', url: 'https://senshi-embed.test/one', extractedUrl: 'https://media.test/mkissa.mp4', extractedType: 'mp4' }] }));
     if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/1000') return req.respond(json({ providers: { aniwaves: { episodes: { sub: [{ id: 'watch/aniwaves/1000/sub/aniwaves-1', number: 1 }] } }, senshi: { episodes: { sub: [{ id: 'watch/senshi/1000/sub/senshi-1', number: 1 }] } } } }));
     if (u.hostname === 'kitsune-api.test' && u.pathname.startsWith('/api/watch/')) return req.respond(json({ streams: [{ server: 'First', type: 'embed', url: 'https://senshi-embed.test/one' }, { server: 'Second', type: 'embed', url: 'https://senshi-embed.test/two' }] }));
     if (u.hostname === 'stream.test' && u.pathname === '/senshi') return req.respond(json({ streams: [{ server: 'Senshi', type: 'embed', url: 'https://senshi-embed.test/one' }, { server: 'FileMoon', type: 'embed', url: 'https://senshi-embed.test/two' }] }));
@@ -107,7 +111,30 @@ try {
   check('detail strips <script> from synopsis', !(await page.$eval('#desc', (e) => e.innerHTML)).includes('<script') && (await page.$eval('#desc', (e) => e.innerHTML)).includes('<i>unforgettable</i>'));
   check('detail lists episodes', (await count('.ep')) >= 5);
   check('detail has official stream links', (await count('.stream-link')) >= 2);
+  check('anime mark toggles once after repeated redraws', await (async () => {
+    for (let i = 0; i < 3; i++) { await page.$eval('[data-mark="1"]', (e) => e.click()); }
+    const marked = (await page.$eval('[data-mark="1"]', (e) => e.getAttribute('aria-label'))) === 'Mark unwatched';
+    await page.$eval('[data-mark="1"]', (e) => e.click());
+    return marked;
+  })());
+  check('mark all batches anime updates', await page.evaluate(async () => {
+    const { setMarks } = await import('./js/store.js');
+    const root = document.querySelector('.route-root');
+    const observer = new MutationObserver(() => {});
+    observer.observe(root, { childList: true });
+    document.querySelector('[data-markall]').click();
+    const renders = observer.takeRecords().length;
+    observer.disconnect();
+    setMarks('anime', '1000', []);
+    return renders > 0 && renders <= 2;
+  }));
   check('watch page defaults to the episode player without setup', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }) && await page.$eval('#stage iframe', (e) => e.src === 'https://megaplay.buzz/stream/ani/1000/1/sub' && !e.hasAttribute('sandbox')) && !(await page.$('#deployment-url')));
+  check('MKissa reports unavailable without asking for a link', await (async () => {
+    await page.$eval('[data-src="mkissa"]', (e) => e.click());
+    const unavailable = (await text('#panel')).includes('needs a server') && !(await page.$('#panel input[type="url"]')) && !(await page.$('[data-src="kitsune"]'));
+    await page.click('#use-instant');
+    return unavailable && await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
+  })());
   check('instant player remembers audio and episode', await (async () => {
     await page.click('[data-instant-audio="dub"]');
     const switched = await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/dub'));
@@ -141,10 +168,14 @@ try {
     await page.focus('#tabs [role="tab"][aria-selected="true"]'); await page.keyboard.press('End');
     return (await page.$eval('#tabs [data-src="mine"]', (e) => e.getAttribute('aria-selected'))) === 'true';
   })());
+  check('optional local file player has no URL fields', await (async () => {
+    const hasFile = !!(await page.$('#minefile'));
+    return hasFile && !(await page.$('#panel input[type="url"]'));
+  })());
+  mockProviderEndpoints = true;
+  await visit('/watch/1000/1', '#stage iframe');
   check('watch → AnimeGG worker episode and stream', await (async () => {
     await page.click('[data-src="animegg"]');
-    await page.$eval('#deployment-url', (e) => { e.value = 'https://stream.test'; });
-    await page.click('#animegg-search button');
     await page.waitForSelector('#animegg-play');
     await page.click('#animegg-play');
     await page.waitForSelector('#animegg-stream');
@@ -153,14 +184,21 @@ try {
   check('watch → compatible API discovers providers and mirrors', await (async () => {
     await page.$eval('[data-src="kitsune"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
     await page.click('[data-src="kitsune"]');
-    await page.$eval('#deployment-url', (e) => { e.value = 'https://kitsune-api.test/api'; });
-    await page.click('#kitsune-load button');
     await page.waitForSelector('#kitsune-mirror');
     const providers = await page.$$eval('#kitsune-provider option', (o) => o.map((v) => v.textContent));
     await page.select('#kitsune-provider', '1');
     await page.waitForSelector('#kitsune-mirror');
     await page.select('#kitsune-mirror', '1');
     return providers.includes('aniwaves') && providers.includes('senshi') && await page.$eval('#stage iframe', (e) => e.src === 'https://senshi-embed.test/two');
+  })());
+  check('watch → MKissa sources are selectable', await (async () => {
+    await page.$eval('[data-src="mkissa"]', (e) => e.click());
+    try { await page.waitForSelector('#kitsune-mirror', { timeout: 4000 }); } catch { throw new Error(`MKissa: ${await text('#panel')}; errors: ${errors.join(' | ')}`); }
+    const options = await page.$$eval('#kitsune-mirror option', (o) => o.map((v) => v.textContent));
+    const proxy = await page.$eval('#stage video', (v) => v.src);
+    await page.select('#kitsune-mirror', '1');
+    const embed = await page.$eval('#stage iframe', (e) => e.src);
+    return options.length === 2 && proxy.includes('url=https%3A%2F%2Fmedia.test%2Fmkissa.mp4') && embed === 'https://senshi-embed.test/one';
   })());
   check('watch → Senshi switches retrieved mirrors', await (async () => {
     await page.$eval('[data-src="senshi"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
@@ -174,7 +212,6 @@ try {
     await page.click('[data-src="anipub"]');
     try { await page.waitForSelector('#anipub-search', { timeout: 2000 }); }
     catch { throw new Error(`AniPub tab did not open; active=${await page.$eval('#tabs [aria-selected="true"]', (e) => e.dataset.src)}; page errors=${errors.join(' | ')}`); }
-    await page.$eval('#deployment-url', (e) => { e.value = 'https://anipub.test'; });
     await page.click('#anipub-search button');
     await page.waitForSelector('#anipub-play');
     await page.click('#anipub-play');
@@ -186,6 +223,7 @@ try {
     const source = await anipubSource('https://anipub.test', 42, 2, 'sub');
     return source.kind === 'video' && source.url === 'https://anipub.test/videos/episode.mp4';
   }));
+  mockProviderEndpoints = false;
   check('watch → official services tab', await (async () => { await page.click('[data-src="official"]'); await page.waitForSelector('.launchpad'); return true; })());
   await page.screenshot({ path: SHOTS ? new URL('./__screens__/watch-official.png', import.meta.url).pathname : '/dev/null' }).catch(() => {});
   check('watch → free library tab lists results', await (async () => { await page.click('[data-src="library"]'); await page.waitForSelector('.lib-item', { timeout: 6000 }); return true; })());
@@ -203,7 +241,17 @@ try {
 
   console.log('Manga');
   check('manga home', await visit('/manga', '.mhero-slide.active', { shot: 'manga' }) && (await count('.rail .card')) > 30);
+  check('manga carousel loads other slides on demand', await (async () => {
+    const before = await page.$$eval('.mhero-slide:not(.active) img[data-hero-src]', (imgs) => imgs.length);
+    await page.$eval('#mhero [data-dot="1"]', (e) => e.click());
+    const slides = await count('.mhero-slide');
+    return before === 2 * (slides - 1) && await page.$eval('.mhero-slide.active .mhero-bg', (img) => !!img.getAttribute('src'));
+  })());
   check('manga detail with chapters', await visit('/manga/00000000-0000-4000-8000-000000000000', '.ch', { shot: 'manga-detail' }) && (await count('.ch')) === 30);
+  check('manga read mark toggles once after repeated redraws', await (async () => {
+    for (let i = 0; i < 3; i++) await page.$eval('.ch [data-read]', (e) => e.click());
+    return (await page.$eval('.ch [data-read]', (e) => e.getAttribute('aria-label'))) === 'Mark unread';
+  })());
   check('manga search (type filter)', await visit('/search?type=manga&origin=ko', '.grid .card'));
   check('reader (vertical)', await visit('/read/00000000-0000-4000-8000-000000000000/11111111-0000-4000-8000-000000000005', '.reader .rwrap', { shot: 'reader' }) && (await count('.rwrap')) === 8);
   await page.evaluate(() => localStorage.setItem('nx:settings', JSON.stringify({ readerMode: 'rtl' })));
@@ -227,6 +275,21 @@ try {
   check('discover directory', await visit('/discover', '.dir-card', { shot: 'discover' }) && (await count('.dir-card')) > 30);
   check('free library page', await visit('/free', '.lib-item', { shot: 'free' }));
   check('settings', await visit('/settings', '.set-card', { shot: 'settings' }));
+  check('route navigation replaces the delegated-listener root', await (async () => {
+    await page.evaluate(() => { window.oldRouteRoot = document.querySelector('.route-root'); location.hash = '#/discover'; });
+    await page.waitForSelector('.dir-card');
+    return await page.evaluate(() => !window.oldRouteRoot.isConnected && window.oldRouteRoot !== document.querySelector('.route-root'));
+  })());
+  await visit('/settings', '.set-card');
+  check('lightweight effects can be manually overridden', await (async () => {
+    await page.$eval('[data-set="performanceMode"][data-v="on"]', (e) => e.click());
+    const on = await page.$eval('html', (e) => e.dataset.performance === 'on');
+    const noBlur = await page.$eval('.set-card', (e) => getComputedStyle(e).backdropFilter === 'none');
+    await page.$eval('[data-set="performanceMode"][data-v="off"]', (e) => e.click());
+    const off = await page.$eval('html', (e) => e.dataset.performance === 'off');
+    await page.$eval('[data-set="performanceMode"][data-v="auto"]', (e) => e.click());
+    return on && noBlur && off;
+  })());
   check('settings: change accent', await (async () => { await page.click('[data-set="accent"][data-v="rose"]'); return (await page.$eval('html', (e) => e.dataset.accent)) === 'rose'; })());
   check('TV mode enables directional navigation', await (async () => {
     await page.$eval('[data-tv="on"]', (e) => e.click());

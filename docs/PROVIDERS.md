@@ -20,7 +20,7 @@ GitHub Pages cannot execute the worker. To use it with Pages:
    npx wrangler secret put TOKEN_SECRET --config streaming/wrangler.toml
    ```
    Supply a random secret of at least 32 characters to the secret prompt; do not commit it. For example, generate one locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
-3. On a watch page, select **AnimeGG**, enter the HTTPS worker URL printed by Wrangler and search. Choose the matching series/season and audio, then load the episode. The URL is saved in browser settings. You can remove it with **Forget URL**.
+3. The site maintainer sets `streamWorker` in `js/config.js` to the HTTPS worker URL and redeploys the site. Once configured, viewers can select **AnimeGG** or **Senshi** without entering a URL.
 
 The worker fetches provider HTML, issues time-limited signed URLs for sources, and proxies MP4 or HLS manifests, keys, segments and range requests. The token secret is required; arbitrary client-supplied proxy URLs are not accepted. The worker rejects literal IPs, credentials, local hostnames, non-HTTPS URLs and non-standard ports; provider pages and signed HLS manifests still determine which upstream domains it contacts. Origin checks are not authentication: configure Cloudflare access controls, rate limits and usage limits as appropriate for your deployment. Provider HTML, mirrors, CORS, URLs, availability and episode numbering can change. Some HLS formats or servers may not work; live provider access was not tested in this sandbox.
 
@@ -30,9 +30,15 @@ The same worker exposes `/senshi?mal={id}&episode={number}&audio=sub|dub`, fetch
 
 ### More servers: compatible provider API
 
-The **More servers** tab speaks the Kitsune-compatible provider API contract: `/episodes/{anilistId}`, `/watch/{provider}/{anilistId}/{sub|dub}/{provider}-{episode}`, and `/proxy`. It displays reported providers and their individual mirrors and uses the configured API's proxy for HLS/MP4. The API base must be an HTTPS URL ending in `/api`; it is stored locally in your browser. Only connect an API you trust. Nothing in this tab embeds the upstream website.
+When configured by the site maintainer in `js/config.js`, the **More servers** tab speaks the Kitsune-compatible provider API contract: `/episodes/{anilistId}`, `/watch/{provider}/{anilistId}/{sub|dub}/{provider}-{episode}`, and `/proxy`. It displays reported providers and their individual mirrors and uses the configured API's proxy for HLS/MP4. The API base must be a trusted HTTPS URL ending in `/api`; viewers do not enter it. Nothing in this tab embeds the upstream website.
 
 The adapter recognizes all 12 providers listed below, but this repository does **not** contain or host their full server-side extractors. The API must already be separately deployed and must allow your Pages origin with CORS; its proxy and providers need their own access controls, network protections and rate limits. The upstream proxy accepts arbitrary URLs and must not be exposed publicly without hardening. Media URLs, required headers, encrypted playlists, ads and subtitles vary; this frontend forwards a referer and playlist key but not arbitrary provider headers, so some streams may fail. Provider discovery and switching are mock-tested only. Without a compatible backend, use Instant play.
+
+### MKissa anime and manga
+
+When a backend is configured, the **MKissa** tab selects MKissa on the compatible provider API and uses its filtered `/episodes/mkissa/{anilistId}?map=false` endpoint. It understands MKissa's `sources` response, including extracted HLS/MP4 and supported embed mirrors. This is a frontend adapter, **not** an MKissa server: a separately hosted, CORS-enabled, hardened API with MKissa support and a working proxy is required. No MKissa backend is deployed by this repository, so the tab displays an unavailable notice and real MKissa playback has not been verified. Viewers are never asked to enter a URL. MKissa may require a security check; the app does not solve or bypass it. Complete any check through the provider, though that authorization may not transfer to the API host.
+
+MKissa also has a manga catalogue (see [AllManga extension](https://github.com/keiyoushi/extensions-source/tree/main/src/en/allanime)), but its page extraction uses a protected browser flow, not the Kitsune anime API. **MKissa manga is not integrated**; NullxAnime's existing manga catalogue and reader remain MangaDex. No MKissa website is embedded. A future implementation needs a permitted, supported page source and must handle access checks without bypassing them.
 
 ### Upstream coverage
 
@@ -42,7 +48,7 @@ The third inspected repository, awesome-anime-sources, is a directory rather tha
 
 ### AniPub
 
-AniPub's `backend/models/AniDB.js` stores the first video link and episode links in MongoDB; `views-ejs/AniPlayer.ejs` renders either an iframe or a video source. The repository does not contain that catalogue or the values of the `aniAPI` and `VIDEOAPI` deployment variables. The AniPub tab uses an AniPub deployment's search API and episode HTML, extracts the underlying player URL, and mounts that video or iframe instead of the whole AniPub page. Search or page fetch requires CORS; the source itself must allow embedding or playback. A numeric title ID can be entered manually, and an open-on-AniPub link is provided if extraction or playback fails. Episode indices on AniPub are zero-based; NullxAnime translates episode 1 to index 0.
+AniPub's `backend/models/AniDB.js` stores the first video link and episode links in MongoDB; `views-ejs/AniPlayer.ejs` renders either an iframe or a video source. The repository does not contain that catalogue or the values of the `aniAPI` and `VIDEOAPI` deployment variables. The AniPub tab uses an AniPub deployment's search API and episode HTML, extracts the underlying player URL, and mounts that video or iframe instead of the whole AniPub page. Search or page fetch requires CORS; the source itself must allow embedding or playback. The AniPub tab is hidden unless a site-maintainer-configured deployment exists; an open-on-AniPub link is provided if extraction or playback fails. Episode indices on AniPub are zero-based; NullxAnime translates episode 1 to index 0.
 
 Do not put credentials in deployment URLs. External providers and deployment operators control their content and permissions.
 
@@ -56,7 +62,7 @@ Each tab on the watch page has a `kind`:
 | `embed` | shows `src` in a sandbox-friendly `<iframe>` (used for official YouTube streams & trailers) |
 | `services` | launch pad with links to official services |
 | `library` | Internet Archive search + custom player |
-| `mine` | the user's own link / local file in the custom player |
+| `mine` | an optional local file in the custom player |
 
 To add one (e.g. a **licensed** service with an embed API, or your own media server):
 

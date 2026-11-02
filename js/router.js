@@ -53,6 +53,10 @@ async function resolve(force = false) {
   current.hash = hash;
 
   const app = $('#app');
+  // A fresh route root disposes delegated listeners from the previous page.
+  const routeRoot = document.createElement('div');
+  routeRoot.className = 'route-root';
+  app.replaceChildren(routeRoot);
   let match = null, params = {};
   for (const r of routes) {
     const m = path.match(r.re);
@@ -61,17 +65,17 @@ async function resolve(force = false) {
   document.body.classList.remove('no-scroll');
   if (!match) {
     setTitle('Not found');
-    render(app, (await import('./ui/components.js')).emptyBox('compass', 'Page not found', 'That page does not exist. Let’s get you back home.',
+    render(routeRoot, (await import('./ui/components.js')).emptyBox('compass', 'Page not found', 'That page does not exist. Let’s get you back home.',
       (await import('./util.js')).html`<a class="btn primary" href="#/">Go home</a>`));
     notify(null, path);
     return;
   }
 
   const ctx = {
-    params, query, path, el: app, token,
+    params, query, path, el: routeRoot, token,
     alive: () => token === current.token,
-    cleanup: (fn) => { current.cleanups.push(fn); },
-    render: (safe) => { if (token === current.token) render(app, safe); },
+    cleanup: (fn) => { if (token === current.token) current.cleanups.push(fn); else fn(); },
+    render: (safe) => { if (token === current.token) render(routeRoot, safe); },
     setTitle,
   };
   notify(match.nav, path);
@@ -87,9 +91,8 @@ async function resolve(force = false) {
   // restore scroll for back/forward, otherwise go to top
   const y = !freshNav && scrollMemo.has(hash) ? scrollMemo.get(hash) : 0;
   freshNav = false;
-  requestAnimationFrame(() => window.scrollTo(0, y));
+  requestAnimationFrame(() => { if (ctx.alive()) window.scrollTo(0, y); });
   app.focus({ preventScroll: true });
-  app.style.animation = 'none'; void app.offsetWidth; app.style.animation = '';
 }
 
 function notify(nav, path) { listeners.forEach((fn) => fn(nav, path)); }
