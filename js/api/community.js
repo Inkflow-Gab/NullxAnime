@@ -1,4 +1,4 @@
-// Clients for user-configured Kitsune and AniPub deployments.
+// Clients for the AnimeGG streaming worker and AniPub catalogue.
 import { safeUrl } from '../util.js';
 
 export function baseUrl(value) {
@@ -15,54 +15,13 @@ async function json(url, signal) {
   let response;
   try { response = await fetch(url, { signal, credentials: 'omit' }); }
   catch (e) { if (e.name === 'AbortError') throw e; throw new Error('Could not reach the deployment. Check its URL, HTTPS and CORS settings.'); }
-  if (!response.ok) throw new Error(`Deployment returned HTTP ${response.status}.`);
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(typeof detail?.error === 'string' ? detail.error : `Deployment returned HTTP ${response.status}.`);
+  }
   const data = await response.json();
   if (data?.error) throw new Error(String(data.error));
   return data;
-}
-
-export function kitsuneEpisodes(base, id, signal) {
-  if (!/^\d+$/.test(String(id))) throw new Error('Invalid AniList ID.');
-  return json(`${baseUrl(base)}/api/episodes/${id}`, signal);
-}
-
-export function episodeOptions(data, number) {
-  const choices = [];
-  const providers = { ...data, ...(data?.providers || {}) };
-  for (const [provider, entry] of Object.entries(providers)) {
-    if (!/^[\w-]+$/.test(provider) || entry?.error) continue;
-    for (const audio of ['sub', 'dub']) {
-      const episodes = entry?.episodes?.[audio];
-      if (!Array.isArray(episodes)) continue;
-      const match = episodes.find((e) => Number(e.number) === Number(number));
-      const path = String(match?.id || '').replace(/^\/+/, '');
-      if (/^watch\/[\w/-]+$/.test(path)) choices.push({ provider, audio, path });
-    }
-  }
-  return choices;
-}
-
-export function kitsuneWatch(base, path, signal) {
-  if (!/^watch\/[\w/-]+$/.test(path)) throw new Error('Invalid episode path.');
-  return json(`${baseUrl(base)}/api/${path}`, signal);
-}
-
-export function kitsuneStreams(data) {
-  return (Array.isArray(data?.streams) ? data.streams : []).filter((s) => {
-    const url = safeUrl(s?.url);
-    return url && s.isActive !== false && (/^(hls|m3u8|mp4)$/i.test(s.type || '') || /\.m3u8(?:[?#]|$)/i.test(url));
-  }).sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
-}
-
-export function kitsuneProxy(base, url, source = {}) {
-  const target = safeUrl(url);
-  if (!target) return '';
-  const params = new URLSearchParams({ url: target });
-  const referer = safeUrl(source.referer || source.headers?.Referer || source.headers?.referer);
-  if (referer) params.set('referer', referer);
-  if (source.headers && typeof source.headers === 'object') params.set('headers', JSON.stringify(source.headers));
-  if (source.playlist_key || source.key) params.set('playlist_key', String(source.playlist_key || source.key));
-  return `${baseUrl(base)}/api/proxy?${params}`;
 }
 
 export async function anipubSearch(base, query, signal) {
@@ -75,4 +34,53 @@ export async function anipubSearch(base, query, signal) {
 export function anipubPlayer(base, id, episode, audio = 'sub') {
   if (!/^\d+$/.test(String(id)) || !Number.isInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid AniPub title or episode.');
   return `${baseUrl(base)}/AniPlayer/${id}/${episode - 1}?type=${audio}`;
+}
+
+/** Client for NullxAnime's own AnimeGG worker. */
+export function animeggSearch(base, query, signal) {
+  const q = String(query || '').trim();
+  if (q.length < 3 || q.length > 150) throw new Error('Search for 3–150 characters.');
+  return json(`${baseUrl(base)}/search?${new URLSearchParams({ q })}`, signal);
+}
+export function animeggEpisodes(base, slug, signal) {
+  if (!/^[a-z\d][a-z\d-]{0,199}$/i.test(slug)) throw new Error('Invalid series.');
+  return json(`${baseUrl(base)}/series?${new URLSearchParams({ slug })}`, signal);
+}
+export function animeggWatch(base, slug, episode, audio, signal) {
+  if (!/^[a-z\d][a-z\d-]{0,199}$/i.test(slug) || !Number.isInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid episode.');
+  return json(`${baseUrl(base)}/watch?${new URLSearchParams({ slug, episode: String(episode), audio })}`, signal);
+}
+
+/** Extract only the actual player source from AniPub's rendered episode page. */
+export async function anipubSource(base, id, episode, audio, signal) {
+  const pageUrl = anipubPlayer(base, id, episode, audio);
+  let response;
+  try { response = await fetch(pageUrl, { signal, credentials: 'omit' }); }
+  catch (e) { if (e.name === 'AbortError') throw e; throw new Error('AniPub episode could not be read. Check CORS and availability.'); }
+  if (!response.ok) throw new Error(`AniPub returned HTTP ${response.status}.`);
+  const limit = 2 * 1024 * 1024;
+  if (Number(response.headers.get('content-length')) > limit) throw new Error('AniPub episode page is too large.');
+  let page = '';
+  if (response.body) {
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let size = 0;
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > limit) { await reader.cancel(); throw new Error('AniPub episode page is too large.'); }
+        page += decoder.decode(value, { stream: true });
+      }
+      page += decoder.decode();
+    } finally { reader.releaseLock(); }
+  }
+  const document = new DOMParser().parseFromString(page, 'text/html');
+  const video = document.querySelector('.video-section .video-container video');
+  const frame = document.querySelector('.video-section .video-container > iframe');
+  const raw = video?.querySelector('source[src]')?.getAttribute('src') || video?.getAttribute('src') || frame?.getAttribute('src');
+  if (!raw) throw new Error('AniPub did not provide a player source for this episode.');
+  const url = new URL(raw, pageUrl);
+  if (url.protocol !== 'https:' || url.username || url.password) throw new Error('AniPub returned an invalid or insecure player URL.');
+  return { kind: video ? 'video' : 'embed', url: url.href, pageUrl };
 }

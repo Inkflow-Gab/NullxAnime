@@ -30,10 +30,13 @@ async function mockNetwork(page) {
     const url = req.url();
     const u = new URL(url);
     if (u.origin === new URL(BASE).origin) return req.continue();
-    if (u.hostname === 'kitsune.test' && u.pathname === '/api/episodes/1000') return req.respond(json({ providers: { anikoto: { episodes: { sub: [{ number: 1, id: 'watch/anikoto/1000/sub/anikoto-1' }], dub: [{ number: 1, id: 'watch/anikoto/1000/dub/anikoto-1' }] } } } }));
-    if (u.hostname === 'kitsune.test' && u.pathname.startsWith('/api/watch/')) return req.respond(json({ streams: [{ url: 'https://video.test/episode.mp4', type: 'mp4', server: 'test' }] }));
+    if (u.hostname === 'stream.test' && u.pathname === '/search') return req.respond(json({ results: [{ slug: 'mock-series', title: 'Mock anime' }] }));
+    if (u.hostname === 'stream.test' && u.pathname === '/series') return req.respond(json({ episodes: [{ number: 1, sub: true, dub: false }] }));
+    if (u.hostname === 'stream.test' && u.pathname === '/watch') return req.respond(json({ streams: [{ url: 'https://stream.test/media?token=mock', type: 'mp4', server: 'test' }] }));
     if (u.hostname === 'anipub.test' && u.pathname.startsWith('/api/search/')) return req.respond(json([{ Name: 'Mock anime', Id: 42 }]));
-    if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>AniPub mock</body></html>' });
+    if (u.hostname === 'anipub.test' && u.pathname === '/AniPlayer/42/1') return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><video><source src="/videos/episode.mp4"></video></div></section>' });
+    if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><iframe src="https://anipub.test/video-embed"></iframe></div></section>' });
+    if (u.hostname === 'anipub.test' && u.pathname === '/video-embed') return req.respond({ status: 200, contentType: 'text/html', body: 'Episode player mock' });
     if (u.hostname === 'graphql.anilist.co') return req.respond(json(anilist(req.postData() || '{}')));
     if (u.hostname === 'api.mangadex.org') return req.respond(json(mangadex(url)));
     if (u.hostname === 'archive.org' && !u.pathname.startsWith('/download') && !u.pathname.startsWith('/services')) return req.respond(json(archive(url)));
@@ -94,12 +97,14 @@ try {
     await page.focus('#tabs [role="tab"][aria-selected="true"]'); await page.keyboard.press('End');
     return (await page.$eval('#tabs [data-src="mine"]', (e) => e.getAttribute('aria-selected'))) === 'true';
   })());
-  check('watch → Kitsune episode and stream', await (async () => {
-    await page.click('[data-src="kitsune"]');
-    await page.$eval('#deployment-url', (e) => { e.value = 'https://kitsune.test'; });
-    await page.click('#deployment-form button');
-    await page.waitForSelector('#kitsune-stream');
-    return (await count('#kitsune-provider option')) === 2 && !!(await page.$('#stage video')) && (await page.$eval('#stage video', (v) => v.src)).includes('/api/proxy?');
+  check('watch → AnimeGG worker episode and stream', await (async () => {
+    await page.click('[data-src="animegg"]');
+    await page.$eval('#deployment-url', (e) => { e.value = 'https://stream.test'; });
+    await page.click('#animegg-search button');
+    await page.waitForSelector('#animegg-play');
+    await page.click('#animegg-play');
+    await page.waitForSelector('#animegg-stream');
+    return !!(await page.$('#stage video')) && (await page.$eval('#stage video', (v) => v.src)).startsWith('https://stream.test/media?');
   })());
   check('watch → AniPub search, title and episode', await (async () => {
     await page.click('[data-src="anipub"]');
@@ -107,12 +112,24 @@ try {
     await page.click('#anipub-search button');
     await page.waitForSelector('#anipub-play');
     await page.click('#anipub-play');
-    return (await page.$eval('#stage iframe', (f) => f.src)).includes('/AniPlayer/42/0?type=sub') && !!(await page.$('#anipub-link a'));
+    await page.waitForFunction(() => document.querySelector('#stage iframe')?.src.endsWith('/video-embed'));
+    return (await page.$eval('#stage iframe', (f) => f.src)).endsWith('/video-embed') && !!(await page.$('#anipub-link a'));
   })());
+  check('AniPub direct video source is extracted', await page.evaluate(async () => {
+    const { anipubSource } = await import('./js/api/community.js');
+    const source = await anipubSource('https://anipub.test', 42, 2, 'sub');
+    return source.kind === 'video' && source.url === 'https://anipub.test/videos/episode.mp4';
+  }));
   check('watch → official services tab', await (async () => { await page.click('[data-src="official"]'); await page.waitForSelector('.launchpad'); return true; })());
   await page.screenshot({ path: SHOTS ? new URL('./__screens__/watch-official.png', import.meta.url).pathname : '/dev/null' }).catch(() => {});
   check('watch → free library tab lists results', await (async () => { await page.click('[data-src="library"]'); await page.waitForSelector('.lib-item', { timeout: 6000 }); return true; })());
   check('watch → library item plays in custom player', await (async () => { await page.click('.lib-item'); await page.waitForSelector('.vp video', { timeout: 6000 }); return true; })());
+  check('player shortcuts do not steal arrows from other controls', await page.evaluate(() => {
+    const range = document.querySelector('.vp-range'), mark = document.querySelector('#markbtn');
+    const event = () => new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    const a = event(), b = event(); range.dispatchEvent(a); mark.dispatchEvent(b);
+    return !a.defaultPrevented && !b.defaultPrevented;
+  }));
   check('mark watched updates tracker', await (async () => { await visit('/watch/1000/2', '#markbtn'); await page.click('#markbtn'); await new Promise((r) => setTimeout(r, 300)); const s = JSON.parse(await page.evaluate(() => localStorage.getItem('nx:marks'))); return s['anime:1000']?.includes(2); })());
   check('search page', await visit('/search?type=anime&q=frieren', '.grid .card', { shot: 'search' }));
   check('browse by genre', await visit('/search?type=anime&genre=Action', '.grid .card'));
@@ -145,6 +162,16 @@ try {
   check('free library page', await visit('/free', '.lib-item', { shot: 'free' }));
   check('settings', await visit('/settings', '.set-card', { shot: 'settings' }));
   check('settings: change accent', await (async () => { await page.click('[data-set="accent"][data-v="rose"]'); return (await page.$eval('html', (e) => e.dataset.accent)) === 'rose'; })());
+  check('TV mode enables directional navigation', await (async () => {
+    await page.$eval('[data-tg="tvMode"]', (e) => e.click());
+    if (!(await page.$eval('html', (e) => e.dataset.tvMode === 'on'))) return false;
+    await visit('/', '.nav a[data-nav="anime"]');
+    await page.focus('.nav a[data-nav="anime"]'); await page.keyboard.press('ArrowRight');
+    const moved = await page.evaluate(() => document.activeElement?.dataset.nav === 'manga');
+    await visit('/settings', '[data-tg="tvMode"]');
+    await page.$eval('[data-tg="tvMode"]', (e) => e.click());
+    return moved && (await page.$eval('html', (e) => e.dataset.tvMode === 'off'));
+  })());
   check('about', await visit('/about', '.prose'));
   check('404 route', await visit('/nope', '.empty'));
 
@@ -163,6 +190,9 @@ try {
   check('mobile home + tab bar', await visit('/', '.hero-slide.active', { shot: 'mobile-home' }) && (await page.$eval('.tabbar', (e) => getComputedStyle(e).display)) === 'flex');
   check('mobile detail', await visit('/anime/1002', '.detail-title', { shot: 'mobile-anime' }));
   check('no horizontal overflow on mobile', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
+  check('small phone home stays within viewport', await visit('/', '.hero-slide.active') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  check('small phone watch page stays within viewport', await visit('/watch/1000/1', '#stage') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   check('no uncaught JS / console errors', errors.length === 0, `\n    ${errors.slice(0, 6).join('\n    ')}`);
   failed = results.filter((r) => !r.ok).length;

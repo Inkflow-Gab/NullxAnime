@@ -3,7 +3,7 @@
 import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
-import { baseUrl, kitsuneEpisodes, episodeOptions, kitsuneWatch, kitsuneStreams, kitsuneProxy, anipubSearch, anipubPlayer } from '../api/community.js';
+import { baseUrl, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
@@ -38,7 +38,7 @@ export default async function watch(ctx) {
   const hasOfficial = streamLinks(m).length > 0 || !!epInfo;
   const tabs = [
     ...embeds.filter((s) => s.id !== 'trailer'),
-    { id: 'kitsune', kind: 'kitsune', label: 'Kitsune', note: 'Connect your Kitsune deployment' },
+    { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' },
     { id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'Connect an AniPub deployment' },
     { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
     ...embeds.filter((s) => s.id === 'trailer'),
@@ -113,16 +113,16 @@ export default async function watch(ctx) {
     }
     return now;
   };
-  const sourceQuery = () => ['kitsune', 'anipub'].includes(active.id) ? `?src=${active.id}` : '';
+  const sourceQuery = () => ['animegg', 'anipub'].includes(active.id) ? `?src=${active.id}` : '';
   const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`); };
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
   /* ---------- stage rendering ---------- */
-  function mountPlayer({ src, subtitle, format, label, poster, autoplay = false }) {
+  function mountPlayer({ src, subtitle, format, crossOrigin, label, poster, autoplay = false }) {
     killPlayer();
     stage.className = 'stage';
     player = createPlayer(stage, {
-      src, subtitle, format, poster, label, autoplay,
+      src, subtitle, format, crossOrigin, poster, label, autoplay,
       startAt: getPos(posKey)?.pos || 0,
       onProgress: (pos, dur) => { setPos(posKey, pos, dur); if (dur && pos / dur > 0.9) toggleMark('anime', id, ep, true); },
       onEnded,
@@ -158,16 +158,16 @@ export default async function watch(ctx) {
     } else if (tab.kind === 'services') servicesView();
     else if (tab.kind === 'library') libraryView();
     else if (tab.kind === 'mine') mineView();
-    else if (tab.kind === 'kitsune') kitsuneView();
+    else if (tab.kind === 'animegg') animeggView();
     else if (tab.kind === 'anipub') anipubView();
   }
 
   /* ----- External deployments ----- */
-  const deploymentKey = (name) => name === 'Kitsune' ? 'kitsuneUrl' : 'anipubUrl';
+  const deploymentKey = (name) => name === 'AnimeGG' ? 'streamWorkerUrl' : 'anipubUrl';
   function deploymentForm(name, defaultUrl = '') {
     const saved = getSettings()[deploymentKey(name)] || defaultUrl;
     return html`<form id="deployment-form" class="mine-form glass">
-      <label class="field">${name} deployment URL<input id="deployment-url" class="input" type="url" required value="${saved}" placeholder="https://your-deployment.example"></label>
+      <label class="field">${name === 'AnimeGG' ? 'Streaming worker URL' : 'AniPub deployment URL'}<input id="deployment-url" class="input" type="url" required value="${saved}" placeholder="${name === 'AnimeGG' ? 'https://your-worker.workers.dev' : 'https://your-deployment.example'}"></label>
       <div class="row"><button class="btn primary">Connect</button><button type="button" class="btn" id="deployment-forget">Forget URL</button><span class="muted">Stored in this browser. HTTPS and cross-origin access are required.</span></div>
     </form><div id="deployment-results" aria-live="polite"></div>`;
   }
@@ -176,57 +176,56 @@ export default async function watch(ctx) {
     const box = $('#deployment-results', panel);
     if (box) render(box, html`<div class="notice" role="alert">${error.message || 'Could not load this source.'}</div>`);
   }
-  function kitsuneView() {
-    placeholder('film', 'Kitsune', 'Connect a running Kitsune deployment to load its episode sources.');
-    render(panel, deploymentForm('Kitsune', 'https://kitsunee.moe'));
+  function animeggView() {
+    placeholder('film', 'AnimeGG', 'Search for this title using your NullxAnime streaming worker.');
+    render(panel, html`${deploymentForm('AnimeGG')}<form id="animegg-search" class="mine-form glass"><label class="field">Title<input class="input" id="animegg-query" value="${item.title}" required minlength="3" maxlength="150"></label><button class="btn primary">${icon('search')} Search provider</button><p class="muted">Select the exact series and season. The worker must be deployed separately; GitHub Pages is static.</p></form>`);
     const controller = sourceController;
-    const current = () => ctx.alive() && active.kind === 'kitsune' && !controller.signal.aborted;
-    let lookupSerial = 0;
-    $('#deployment-forget', panel).addEventListener('click', () => { setSetting(deploymentKey('Kitsune'), ''); select(active); });
-    $('#deployment-form', panel).addEventListener('submit', async (event) => {
+    const current = () => ctx.alive() && active.kind === 'animegg' && !controller.signal.aborted;
+    let serial = 0;
+    $('#deployment-forget', panel).addEventListener('click', () => { setSetting(deploymentKey('AnimeGG'), ''); select(active); });
+    const search = async (event) => {
       event.preventDefault();
-      const lookup = ++lookupSerial;
+      const task = ++serial;
       try {
         const base = baseUrl($('#deployment-url', panel).value);
-        setSetting(deploymentKey('Kitsune'), base);
-        placeholder('film', 'Kitsune', 'Looking for episode sources…');
-        render($('#deployment-results', panel), html`<p class="muted">Looking for episode sources…</p>`);
-        const data = await kitsuneEpisodes(base, id, controller.signal);
-        if (!current() || lookup !== lookupSerial) return;
-        const options = episodeOptions(data, ep);
-        if (!options.length) throw new Error('No Kitsune provider has this episode.');
-        render($('#deployment-results', panel), html`<label class="field">Provider and audio<select class="select" id="kitsune-provider">${options.map((o, i) => html`<option value="${i}">${o.provider} · ${o.audio.toUpperCase()}</option>`)}</select></label><div id="kitsune-streams"></div>`);
-        let request = 0;
-        const load = async () => {
-          const serial = ++request;
+        setSetting(deploymentKey('AnimeGG'), base);
+        placeholder('film', 'AnimeGG', 'Searching the provider…');
+        render($('#deployment-results', panel), html`<p class="muted">Searching…</p>`);
+        const data = await animeggSearch(base, $('#animegg-query', panel).value, controller.signal);
+        if (!current() || task !== serial) return;
+        const results = Array.isArray(data.results) ? data.results.filter((x) => /^[a-z\d][a-z\d-]{0,199}$/i.test(x.slug || '') && x.title).slice(0, 50) : [];
+        if (!results.length) throw new Error('No titles found. Try another name.');
+        render($('#deployment-results', panel), html`<label class="field">Choose the exact title and season<select id="animegg-title" class="select">${results.map((r) => html`<option value="${r.slug}">${r.title}</option>`)}</select></label><label class="field">Audio<select id="animegg-audio" class="select"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn primary" id="animegg-play">${icon('play')} Load episode ${ep}</button><div id="animegg-streams" aria-live="polite"></div>`);
+        $('#animegg-play', panel).addEventListener('click', async () => {
+          const playTask = ++serial;
           try {
-            const choice = options[Number($('#kitsune-provider', panel).value)];
-            placeholder('film', 'Kitsune', 'Loading the selected provider…');
-            render($('#kitsune-streams', panel), html`<p class="muted">Loading streams…</p>`);
-            const result = await kitsuneWatch(base, choice.path, controller.signal);
-            if (!current() || lookup !== lookupSerial || serial !== request) return;
-            const streams = kitsuneStreams(result);
-            if (!streams.length) throw new Error('No playable streams for this provider. Try another.');
-            render($('#kitsune-streams', panel), html`<label class="field">Stream<select class="select" id="kitsune-stream">${streams.map((s, i) => html`<option value="${i}">${s.server || 'Stream'}${s.quality ? ` · ${s.quality}` : ''}</option>`)}</select></label><p class="muted">Playback uses the configured Kitsune deployment’s proxy.</p>`);
+            const slug = $('#animegg-title', panel).value, audio = $('#animegg-audio', panel).value;
+            placeholder('film', 'AnimeGG', 'Loading this episode…');
+            render($('#animegg-streams', panel), html`<p class="muted">Loading…</p>`);
+            const listing = await animeggEpisodes(base, slug, controller.signal);
+            if (!current() || playTask !== serial) return;
+            if (!Array.isArray(listing.episodes) || !listing.episodes.some((e) => Number(e.number) === ep && e[audio])) throw new Error(`Episode ${ep} is not available with ${audio} audio for this series.`);
+            const data = await animeggWatch(base, slug, ep, audio, controller.signal);
+            if (!current() || playTask !== serial) return;
+            const streams = (Array.isArray(data.streams) ? data.streams : []).filter((s) => {
+              const url = safeUrl(s.url);
+              return url && new URL(url).origin === new URL(base).origin && ['hls', 'mp4'].includes(s.type);
+            });
+            if (!streams.length) throw new Error('No playable streams were returned for this episode.');
+            render($('#animegg-streams', panel), html`<label class="field">Stream<select class="select" id="animegg-stream">${streams.map((s, i) => html`<option value="${i}">${s.server || 'Stream'} · ${s.quality || 'Auto'}</option>`)}</select></label>`);
             const play = () => {
-              const source = streams[Number($('#kitsune-stream', panel).value)];
-              const subs = [...(Array.isArray(result.subtitles) ? result.subtitles : []), ...(Array.isArray(source.subtitles) ? source.subtitles : [])];
-              const sub = subs.find((x) => x.default && (x.file || x.url)) || subs.find((x) => (x.file || x.url) && x.kind !== 'thumbnails');
-              const subUrl = sub?.file || sub?.url || '';
-              const subtitle = subUrl ? kitsuneProxy(base, subUrl, source) + (/\.srt(?:[?#]|$)/i.test(subUrl) ? '#subtitle.srt' : '') : '';
-              mountPlayer({ src: kitsuneProxy(base, source.url, source), subtitle, format: /^(hls|m3u8)$/i.test(source.type || '') || /\.m3u8(?:[?#]|$)/i.test(source.url) ? 'hls' : undefined, label: `${item.title} · ${choice.provider}`, poster: item.cover, autoplay: true });
+              const source = streams[Number($('#animegg-stream', panel).value)];
+              mountPlayer({ src: source.url, format: source.type === 'hls' ? 'hls' : undefined, crossOrigin: true, label: item.title, poster: item.cover, autoplay: true });
             };
-            $('#kitsune-stream', panel).addEventListener('change', play);
+            $('#animegg-stream', panel).addEventListener('change', play);
             play();
-          } catch (error) {
-            if (current() && lookup === lookupSerial && serial === request) render($('#kitsune-streams', panel), html`<p role="alert">${error.message}</p>`);
-          }
-        };
-        $('#kitsune-provider', panel).addEventListener('change', load);
-        load();
-      } catch (error) { if (current() && lookup === lookupSerial) deploymentError(error); }
-    });
-    $('#deployment-form', panel).requestSubmit();
+          } catch (error) { if (current() && playTask === serial && error.name !== 'AbortError') { placeholder('film', 'Episode unavailable', 'Try another title, audio, or provider.'); render($('#animegg-streams', panel), html`<p role="alert">${error.message}</p>`); } }
+        });
+      } catch (error) { if (current() && task === serial && error.name !== 'AbortError') { placeholder('film', 'Search unavailable', 'Check the worker URL and try again.'); deploymentError(error); } }
+    };
+    $('#deployment-form', panel).addEventListener('submit', search);
+    $('#animegg-search', panel).addEventListener('submit', search);
+    if (getSettings()[deploymentKey('AnimeGG')]) $('#animegg-search', panel).requestSubmit();
   }
   function anipubView() {
     placeholder('film', 'AniPub', 'Search the AniPub catalogue and select the matching title.');
@@ -246,23 +245,32 @@ export default async function watch(ctx) {
         if (!current() || lookup !== lookupSerial) return;
         if (!results.length) throw new Error('No matching titles found. Try another title.');
         render($('#deployment-results', panel), html`<label class="field">Choose the matching title<select class="select" id="anipub-title">${results.map((r) => html`<option value="${r.Id}">${r.Name}</option>`)}</select></label><label class="field">Audio<select class="select" id="anipub-audio"><option value="sub">Sub</option><option value="dub">Dub</option></select></label><button class="btn primary" id="anipub-play">${icon('play')} Open episode ${ep}</button><div id="anipub-link"></div>`);
-        $('#anipub-play', panel).addEventListener('click', () => {
-          const url = anipubPlayer(base, $('#anipub-title', panel).value, ep, $('#anipub-audio', panel).value);
-          mountEmbed(url, 'AniPub player', true);
-          render($('#anipub-link', panel), html`<p class="muted">If embedding is blocked, <a href="${url}" target="_blank" rel="noopener noreferrer">open this episode on AniPub</a>.</p>`);
-        });
+        $('#anipub-play', panel).addEventListener('click', () => playAniPub(base, $('#anipub-title', panel).value, $('#anipub-audio', panel).value, $('#anipub-link', panel)));
+
       } catch (error) { if (current() && lookup === lookupSerial) deploymentError(error); }
     };
     $('#deployment-form', panel).addEventListener('submit', search);
     $('#anipub-search', panel).addEventListener('submit', search);
+    async function playAniPub(base, titleId, audio, box) {
+      const task = ++lookupSerial;
+      const page = anipubPlayer(base, titleId, ep, audio);
+      render(box, html`<p class="muted">Loading the episode source… <a href="${page}" target="_blank" rel="noopener noreferrer">Open on AniPub</a></p>`);
+      try {
+        const source = await anipubSource(base, titleId, ep, audio, controller.signal);
+        if (!current() || task !== lookupSerial) return;
+        if (source.kind === 'video') mountPlayer({ src: source.url, label: item.title, poster: item.cover, autoplay: true });
+        else mountEmbed(source.url, 'AniPub episode', true);
+        render(box, html`<p class="muted">Playing the episode source. If playback is blocked, <a href="${page}" target="_blank" rel="noopener noreferrer">open on AniPub</a>.</p>`);
+      } catch (error) {
+        if (current() && task === lookupSerial && error.name !== 'AbortError') render(box, html`<p role="alert">${error.message} <a href="${page}" target="_blank" rel="noopener noreferrer">Open on AniPub</a>.</p>`);
+      }
+    }
     $('#anipub-manual', panel).addEventListener('submit', (event) => {
       event.preventDefault();
       try {
         const base = baseUrl($('#deployment-url', panel).value);
         setSetting(deploymentKey('AniPub'), base);
-        const url = anipubPlayer(base, $('#anipub-id', panel).value, ep, $('#anipub-manual-audio', panel).value);
-        mountEmbed(url, 'AniPub player', true);
-        render($('#anipub-manual-link', panel), html`<p class="muted">If embedding is blocked, <a href="${url}" target="_blank" rel="noopener noreferrer">open this episode on AniPub</a>.</p>`);
+        playAniPub(base, $('#anipub-id', panel).value, $('#anipub-manual-audio', panel).value, $('#anipub-manual-link', panel));
       } catch (error) { deploymentError(error); }
     });
   }

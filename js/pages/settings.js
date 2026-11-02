@@ -25,6 +25,7 @@ export default async function settings(ctx) {
         <div class="set-row"><div><b>Anime titles</b><small>Which title to show first.</small></div>
           <div class="seg">${[['romaji', 'Romaji'], ['english', 'English'], ['native', 'Native']].map(([v, l]) => html`<button data-set="titleLang" data-v="${v}" class="${s.titleLang === v ? 'on' : ''}">${l}</button>`)}</div></div>
         <div class="set-row"><div><b>Airing countdowns on cards</b><small>Show “EP 5 · 2d 4h” badges.</small></div>${toggle('showCountdown', s.showCountdown)}</div>
+        <div class="set-row"><div><b>TV mode</b><small>Larger controls and arrow-key navigation for compatible remotes. Enter activates the focused item.</small></div>${toggle('tvMode', s.tvMode)}</div>
         <div class="set-row"><div><b>Reduce motion</b><small>Disable carousels and animations.</small></div>${toggle('reduceMotion', s.reduceMotion)}</div>
       </section>
 

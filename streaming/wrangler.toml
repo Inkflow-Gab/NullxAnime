@@ -1,0 +1,7 @@
+name = "nullxanime-streaming"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+# Origin only, without a trailing slash or repository path.
+ALLOWED_ORIGINS = "https://inkflow-gab.github.io"

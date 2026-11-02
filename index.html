@@ -11,7 +11,7 @@
   <meta property="og:type" content="website">
   <meta property="og:image" content="assets/og.png">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preconnect" href="https://graphql.anilist.co" crossorigin>
@@ -26,6 +26,7 @@
       var r = document.documentElement;
       if (s.theme) r.dataset.theme = s.theme;
       if (s.accent) r.dataset.accent = s.accent;
+      if (s.tvMode) r.dataset.tvMode = 'on';
       if (s.reduceMotion) r.classList.add('reduce-motion');
     } catch (e) {}
   </script>

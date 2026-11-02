@@ -1,13 +1,30 @@
 # Adding a watch source ("provider")
 
-## Community deployments
+## Community streaming
 
-On any watch page, choose **Kitsune** or **AniPub**. These integrations use their upstream interfaces; they do not include a backend, catalogue or video in this repository.
+### AnimeGG provider (adapted from Kitsune)
 
-- **Kitsune:** The tab defaults to the upstream project’s listed deployment, `https://kitsunee.moe`, and attempts to load sources when selected. Alternatively, run a Kitsune deployment as described in its [README](https://github.com/Dovakiin0/Kitsune), make it accessible over HTTPS, and enter its root URL (not `/api`) in the Kitsune tab. The default is not verified live here and may be down or reject cross-origin requests. NullxAnime requests `/api/episodes/{anilistId}`, lets you pick a provider and sub/dub, requests the returned `/api/watch/...` episode ID, and plays a stream through that deployment's `/api/proxy`. The browser must be allowed to access these endpoints via CORS. The upstream proxy may expose access to arbitrary URLs; secure your deployment rather than exposing an unprotected proxy publicly.
-- **AniPub:** Enter an HTTPS deployment root URL (defaults to `https://anipub.org`). Search by title, explicitly select the correct match, then open the episode. The upstream search API must permit cross-origin browser access. If it does not, find the numeric ID in AniPub's `/AniPlayer/<ID>/...` URL and enter it manually. The AniPub site must allow framing for in-page playback; otherwise use the provided open-in-new-tab link. AniPub's episode indexes begin at zero, so NullxAnime episode 1 uses index 0. Audio options and availability depend on AniPub.
+`streaming/worker.js` implements a small, separately deployed Cloudflare Worker. The search, series/episode parsing and stream extraction are adapted from Kitsune's AnimeGG provider at commit `cd05752f01d3365fdd5a600445703084383f3c78`; the MIT notice is in `streaming/LICENSE.kitsune`. This is one Kitsune provider, not the entire Kitsune app or all of its providers. NullxAnime does not contact the Kitsune website for this provider.
 
-URLs are stored in browser localStorage and must not contain credentials. HTTPS is required. External sources can fail, change, block embeds, or lack a particular episode. The deployment operator is responsible for its contents and permissions. GitHub Pages cannot run the required server. No live external services are exercised by the automated tests.
+GitHub Pages cannot execute the worker. To use it with Pages:
+
+1. Have a Cloudflare account with Workers enabled and Node.js 20 or newer. Set `ALLOWED_ORIGINS` in `streaming/wrangler.toml` to your Pages origin (for this repo, `https://inkflow-gab.github.io`; no `/NullxAnime` or trailing slash). Additional origins can be comma-separated.
+2. From the repo root, authenticate Wrangler and deploy:
+   ```sh
+   npx wrangler login
+   npx wrangler deploy --config streaming/wrangler.toml
+   npx wrangler secret put TOKEN_SECRET --config streaming/wrangler.toml
+   ```
+   Supply a random secret of at least 32 characters to the secret prompt; do not commit it. For example, generate one locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+3. On a watch page, select **AnimeGG**, enter the HTTPS worker URL printed by Wrangler and search. Choose the matching series/season and audio, then load the episode. The URL is saved in browser settings. You can remove it with **Forget URL**.
+
+The worker fetches provider HTML, issues time-limited signed URLs for sources, and proxies MP4 or HLS manifests, keys, segments and range requests. The token secret is required; arbitrary client-supplied proxy URLs are not accepted. The worker rejects literal IPs, credentials, local hostnames, non-HTTPS URLs and non-standard ports; provider pages and signed HLS manifests still determine which upstream domains it contacts. Origin checks are not authentication: configure Cloudflare access controls, rate limits and usage limits as appropriate for your deployment. Provider HTML, mirrors, CORS, URLs, availability and episode numbering can change. Some HLS formats or servers may not work; live provider access was not tested in this sandbox.
+
+### AniPub
+
+AniPub's `backend/models/AniDB.js` stores the first video link and episode links in MongoDB; `views-ejs/AniPlayer.ejs` renders either an iframe or a video source. The repository does not contain that catalogue or the values of the `aniAPI` and `VIDEOAPI` deployment variables. The AniPub tab uses an AniPub deployment's search API and episode HTML, extracts the underlying player URL, and mounts that video or iframe instead of the whole AniPub page. Search or page fetch requires CORS; the source itself must allow embedding or playback. A numeric title ID can be entered manually, and an open-on-AniPub link is provided if extraction or playback fails. Episode indices on AniPub are zero-based; NullxAnime translates episode 1 to index 0.
+
+Do not put credentials in deployment URLs. External providers and deployment operators control their content and permissions.
 
 ## Built-in sources
 

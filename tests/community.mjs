@@ -1,21 +1,15 @@
 import assert from 'node:assert/strict';
-import { baseUrl, episodeOptions, kitsuneStreams, kitsuneProxy, anipubSearch, anipubPlayer, kitsuneWatch } from '../js/api/community.js';
+import { baseUrl, animeggSearch, animeggEpisodes, animeggWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
 
 assert.equal(baseUrl('https://example.org/root/'), 'https://example.org/root');
 for (const bad of ['http://example.org', 'https://a:b@example.org', 'javascript:alert(1)', 'https://example.org/?secret=x']) assert.throws(() => baseUrl(bad));
-const data = { providers: { anikoto: { episodes: { sub: [{ number: 2, id: 'watch/anikoto/123/sub/anikoto-2' }], dub: [{ number: 2, id: 'watch/anikoto/123/dub/anikoto-2' }] } } } };
-assert.deepEqual(episodeOptions(data, 2).map((o) => o.audio), ['sub', 'dub']);
-assert.deepEqual(episodeOptions(data, 1), []);
-assert.deepEqual(episodeOptions({ providers: { bad: { episodes: { sub: [{ number: 2, id: 'https://evil.test' }] } } } }, 2), []);
-assert.throws(() => kitsuneWatch('https://example.org', '../secrets'));
-assert.equal(kitsuneStreams({ streams: [{ url: 'https://x/test.m3u8', type: 'hls', priority: 5 }, { url: 'javascript:foo', type: 'mp4' }, { url: 'https://x/test.mp4', type: 'mp4', priority: 1 }] })[0].type, 'mp4');
-const p = new URL(kitsuneProxy('https://example.org', 'https://video.test/v.m3u8?a=1&b=2', { referer: 'https://video.test/' }));
-assert.equal(p.searchParams.get('url'), 'https://video.test/v.m3u8?a=1&b=2');
-assert.equal(p.searchParams.get('referer'), 'https://video.test/');
+assert.throws(() => animeggEpisodes('https://example.org', '../private'));
+assert.throws(() => animeggWatch('https://example.org', 'series', 0, 'sub'));
 assert.equal(anipubPlayer('https://example.org', 12, 2, 'dub'), 'https://example.org/AniPlayer/12/1?type=dub');
 assert.throws(() => anipubPlayer('https://example.org', '../../x', 1));
 const oldFetch = globalThis.fetch;
 globalThis.fetch = async () => new Response(JSON.stringify({ Name: 'Test', Id: 3 }), { status: 200 });
 assert.equal((await anipubSearch('https://example.org', 'Test'))[0].Id, 3);
+assert.equal((await animeggSearch('https://example.org', 'Test')).Id, 3);
 globalThis.fetch = oldFetch;
 console.log('Community provider client checks passed');
