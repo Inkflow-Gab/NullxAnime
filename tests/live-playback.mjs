@@ -24,6 +24,8 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 10000));
   const frames = page.frames();
   const videos = (await Promise.all(frames.map((frame) => frame.evaluate(() => Array.from(document.querySelectorAll('video'), (v) => ({ ready: v.readyState, time: v.currentTime, error: v.error?.code || 0 }))).catch(() => [])))).flat();
+  const details = await Promise.all(frames.slice(1).map((frame) => frame.evaluate(() => ({ title: document.title, text: document.body?.innerText?.replace(/\s+/g, ' ').slice(0, 200) || '' })).catch(() => ({ title: '', text: 'frame unavailable' }))));
+  note('notice', `Instant playback frame details: ${JSON.stringify(details)}`);
   const playing = videos.some((v) => v.ready >= 2 && v.time > 1 && !v.error);
   note(playing ? 'notice' : 'warning', `Instant playback smoke test ${playing ? 'observed video progress' : 'did not observe video progress'} for sample AniList 154587 episode 1 (headless browser; ${frames.length} frames, ${videos.length} video elements). Provider availability and other titles may differ.`);
 } catch (error) {
