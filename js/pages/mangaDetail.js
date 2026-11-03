@@ -63,6 +63,7 @@ export default async function mangaDetailPage(ctx) {
             <div class="chips">${m.tags.slice(0, 12).map((t) => html`<a class="chip" href="#/search?type=manga&tag=${t.id}">${t.name}</a>`)}</div>
             <div class="detail-actions">
               ${next ? html`<a class="btn primary lg" href="#/read/${id}/${next.id}">${icon('book')} ${last ? 'Continue' : 'Start reading'} · ${chLabel(next)}</a>` : html`<span class="btn lg disabled">${chapters ? 'No chapters in this language' : 'Loading chapters…'}</span>`}
+              <a class="btn lg ghost" href="#/comic/mangadex/${id}?title=${encodeURIComponent(item.title)}">${icon('search')} Find other providers</a>
               <button class="btn lg" data-action="lib-menu" data-key="manga:${id}">${icon(entry ? 'check' : 'plus')} ${entry ? statusLabel(entry.status, 'manga') : 'Add to list'}</button>
               ${first && chapters.length > 1 ? html`<a class="btn lg ghost" href="#/read/${id}/${chapters[chapters.length - 1].id}">${icon('forward')} Latest</a>` : ''}
               <button class="btn lg ghost" data-share>${icon('share')}</button>

@@ -7,12 +7,16 @@ import { card, rail, fromManga, continueCard, skelRail, toast, PLACEHOLDER } fro
 import { getHistory, getSettings } from '../store.js';
 import { go } from '../router.js';
 import { asuraSearch } from '../api/asura.js';
+import { mountComicDiscovery } from '../ui/comicDiscovery.js';
 
 export default async function mangaHomePage(ctx) {
   ctx.setTitle('Manga');
   const lang = getSettings().mangaLang;
   // Keep independent catalogues reachable even when MangaDex blocks this browser.
-  ctx.render(html`<div class="container page"><h1 class="page-title">Manga &amp; comics</h1>${sourceTiles()}<div id="manga-loading">${skelRail()}</div></div>`);
+  const hist = getHistory('manga').slice(0, 14);
+  ctx.render(html`<div class="container page"><div id="comic-discovery"></div>${!ctx.query.q?.trim() && hist.length ? rail({ title: 'Continue reading', items: hist.map(continueCard), land: true }) : ''}<div id="manga-legacy" ${ctx.query.q?.trim() ? 'hidden' : ''}>${sourceTiles()}<div id="manga-loading">${skelRail()}</div></div></div>`);
+  mountComicDiscovery(ctx);
+  if (ctx.query.q?.trim()) return;
   let feed;
   try { feed = await mangaHome(lang); } catch {
     if (!ctx.alive()) return;
@@ -31,8 +35,7 @@ export default async function mangaHomePage(ctx) {
 
   const f = (arr) => arr.map(fromManga);
   const feat = f(feed.popular).filter((m) => m.cover).slice(0, 6);
-  const hist = getHistory('manga').slice(0, 14);
-  ctx.render(html`<div class="container page" style="padding-top:18px">
+  render($('#manga-legacy', ctx.el), html`<div style="padding-top:18px">
     ${feat.length ? html`<section class="mhero" id="mhero">${feat.map((it, i) => html`<div class="mhero-slide ${i === 0 ? 'active' : ''}">
       <img class="mhero-bg" ${i === 0 ? html`src="${it.cover}" fetchpriority="high"` : html`data-hero-src="${it.cover}"`} alt="" referrerpolicy="no-referrer">
       <div class="mhero-inner">
@@ -49,7 +52,6 @@ export default async function mangaHomePage(ctx) {
 
     ${sourceTiles()}
 
-    ${hist.length ? rail({ title: 'Continue reading', items: hist.map(continueCard), land: true }) : ''}
     ${rail({ title: 'Popular now', sub: 'Most followed on MangaDex', href: '#/search?type=manga&sort=popular', items: f(feed.popular).map((i) => card(i)) })}
     ${rail({ title: 'Latest updates', sub: 'Freshly uploaded chapters', href: '#/search?type=manga&sort=latest', items: f(feed.latest).map((i) => card(i)) })}
     ${rail({ title: 'Top rated', href: '#/search?type=manga&sort=rating', items: f(feed.top).map((i) => card(i)) })}

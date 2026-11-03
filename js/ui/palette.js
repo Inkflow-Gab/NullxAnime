@@ -63,7 +63,7 @@ export function openPalette(initialType) {
       if (!items.length) render(list, html`<div class="empty" style="padding:34px 10px"><p>No ${type} found for “${q}”. Press Enter to search everywhere.</p></div>`);
       else draw();
     } catch (e) {
-      if (my === seq) render(list, type === 'manga' ? html`<div class="empty" style="padding:30px 10px"><p>MangaDex is unavailable. Try another source.</p><a class="btn" href="#/asura?q=${encodeURIComponent(q)}">Search Asura</a><a class="btn" href="#/manga">Manga sources</a></div>` : html`<div class="empty" style="padding:30px 10px"><p>${e.message}</p></div>`);
+      if (my === seq) render(list, type === 'manga' ? html`<div class="empty" style="padding:30px 10px"><p>MangaDex is unavailable. Try another source.</p><a class="btn" href="#/manga?q=${encodeURIComponent(q)}">Search manga sources</a><a class="btn" href="#/manga">Manga sources</a></div>` : html`<div class="empty" style="padding:30px 10px"><p>${e.message}</p></div>`);
     }
   }, 280);
 

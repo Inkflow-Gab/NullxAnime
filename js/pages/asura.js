@@ -4,6 +4,7 @@ import { icon } from '../ui/icons.js';
 import { asuraSearch, asuraDetails, asuraChapters, asuraPages } from '../api/asura.js';
 import { skelGrid, errorBox, emptyBox, PLACEHOLDER } from '../ui/components.js';
 import { go } from '../router.js';
+import { pushHistory } from '../store.js';
 
 export default async function asura(ctx) {
   const { slug, chapter } = ctx.params;
@@ -52,6 +53,7 @@ async function read(ctx, slug, chapter) {
     const index = chapters.findIndex((c) => c.number === chapter);
     if (index < 0) throw new Error('This chapter is unavailable or locked.');
     const prev = chapters[index - 1], next = chapters[index + 1];
+    pushHistory({ type: 'manga', id: `asura:${slug}`, source: 'asura', sourceSlug: slug, chapterId: chapter, title: m.title, cover: m.cover, label: `Chapter ${chapter}` });
     ctx.setTitle(`${m.title} · Chapter ${chapter}`);
     document.body.classList.add('reading');
     ctx.cleanup(() => document.body.classList.remove('reading'));

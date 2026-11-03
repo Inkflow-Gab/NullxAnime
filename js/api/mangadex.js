@@ -3,7 +3,7 @@
 // Adult ratings are requested only after the viewer opts in locally.
 
 import { cached, MIN, HOUR } from '../cache.js';
-import { qs, sleep } from '../util.js';
+import { qs, sleep, requestTimeout } from '../util.js';
 import { getSettings } from '../store.js';
 
 const API = 'https://api.mangadex.org';
@@ -18,7 +18,9 @@ async function call(path, params = {}, attempt = 0) {
   lastAt = Date.now() + Math.max(0, wait);
   if (wait > 0) await sleep(wait);
   const q = qs(params);
-  const res = await fetch(`${API}${path}${q ? `?${q}` : ''}`, { headers: { Accept: 'application/json' } });
+  let res;
+  try { res = await fetch(`${API}${path}${q ? `?${q}` : ''}`, { headers: { Accept: 'application/json' }, signal: requestTimeout(15000) }); }
+  catch { throw new Error('MangaDex could not be reached in this browser or region.'); }
   if (res.status === 429 && attempt < 2) {
     await sleep(((Number(res.headers.get('Retry-After')) || 3) + 0.5) * 1000);
     return call(path, params, attempt + 1);

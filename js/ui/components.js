@@ -77,7 +77,8 @@ export function card(item, opts = {}) {
 /** Landscape "continue" card built from a history entry. */
 export function continueCard(h) {
   const type = h.type;
-  const href = type === 'anime' ? `#/watch/${h.id}/${h.ep}` : `#/read/${h.id}/${h.chapterId}`;
+  const scanSource = ['omega', 'vortex', 'hive'].includes(h.source);
+  const href = type === 'anime' ? `#/watch/${h.id}/${h.ep}` : h.source === 'asura' ? `#/asura/${encodeURIComponent(h.sourceSlug)}/${encodeURIComponent(h.chapterId)}` : scanSource ? `#/scans/${h.source}/${encodeURIComponent(h.sourceSlug)}/${encodeURIComponent(h.chapterId)}` : `#/read/${h.id}/${h.chapterId}`;
   const posKey = type === 'anime' ? `a:${h.id}:${h.ep}` : null;
   const p = posKey ? getPos(posKey) : null;
   const frac = p && p.dur ? Math.min(1, p.pos / p.dur) : null;

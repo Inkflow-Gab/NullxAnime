@@ -36,6 +36,15 @@ export function on(root, type, selector, handler, opts) {
 }
 
 /* ---------- Functions ------------------------------------------------------ */
+// AbortSignal.timeout is missing on some older browsers, but AbortController is common.
+export function requestTimeout(ms) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  if (typeof AbortController === 'undefined') return undefined;
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export function debounce(fn, ms = 250) {
   let t;
   const d = (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
@@ -98,6 +107,13 @@ export function timeAgo(ts) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
   return new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+export const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
+export const fmtLocalDateTime = (unix) => new Date(unix * 1000).toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+// Calendar arithmetic preserves local midnights through daylight-saving transitions.
+export function localDayStarts(count, now = new Date()) {
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  return Array.from({ length: count }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d.getTime(); });
 }
 export const fmtTime = (unix) => new Date(unix * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 export const fmtDateShort = (unix) => new Date(unix * 1000).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });

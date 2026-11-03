@@ -370,3 +370,16 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .release-head > * { position: relative; z-index: 1; }
 .release-kicker { display: block; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .14em; margin-bottom: 8px; }
 .release-head p { color: var(--text-2); }
+.comic-help { margin: 8px 0 18px; font-size: 13px; }
+.comic-providers { margin-top: 16px; }
+.comic-matches { display: grid; gap: 8px; margin-top: 12px; max-width: 680px; }
+.comic-match { display: flex; gap: 12px; align-items: center; padding: 10px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.comic-match:hover, .comic-match:focus-visible { border-color: var(--accent); }
+.comic-match img { width: 44px; height: 60px; object-fit: cover; border-radius: 6px; }
+.comic-match span { flex: 1; min-width: 0; }
+.comic-match small { display: block; color: var(--muted); }
+.comic-match svg { width: 18px; }
+.season-picker { margin: 16px 0; display: grid; gap: 6px; }
+.season-picker .select { width: 100%; }
+.season-picker small, .watch-airing { font-size: 12px; line-height: 1.45; }
+.watch-airing { color: var(--text-2); padding: 12px; border-bottom: 1px solid var(--line); }
