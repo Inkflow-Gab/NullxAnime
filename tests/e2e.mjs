@@ -36,6 +36,7 @@ async function launch() {
 const json = (obj) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(obj) });
 
 let mockProviderEndpoints = false;
+let mockNextRelease = false;
 let blockMangaDex = false;
 let blockReaderImages = false;
 const networkRequests = [];
@@ -46,6 +47,7 @@ async function mockNetwork(page) {
     const url = req.url();
     const u = new URL(url);
     networkRequests.push(url);
+    if (u.origin === new URL(BASE).origin && u.pathname === '/js/data/release.js' && mockNextRelease) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const RELEASE = { id: 'test-next-release', title: 'Future update', changes: ['New future feature'] };" });
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && mockProviderEndpoints) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: 'https://kitsune-api.test/api', streamWorker: 'https://stream.test', aniPub: 'https://anipub.test' });" });
     if (u.origin === new URL(BASE).origin) return req.continue();
     if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
@@ -78,7 +80,7 @@ async function mockNetwork(page) {
       const host = u.hostname === 'api.vortexscans.org' ? 'storage.vortexscans.org' : 'storage.hivetoon.com';
       const comic = { id: 709, slug: 'mock-iken', postTitle: 'Mock Iken', seriesType: 'MANHWA', seriesStatus: 'ONGOING', featuredImage: `https://${host}/upload/cover.webp`, postContent: 'A series' };
       const chapters = [{ id: 2, number: 2, isLocked: true, isAccessible: false, price: 100 }, { id: 3, number: 3, isShortLinkLocked: true, isAccessible: true, price: 0 }, { id: 1, number: 1, isLocked: false, isAccessible: true, price: 0 }];
-      if (u.pathname === '/api/query') return req.respond(json({ posts: [comic], totalCount: 1 }));
+      if (u.pathname === '/api/query') return req.respond(json({ posts: [u.searchParams.get('searchTerm') ? { ...comic, postTitle: 'Mock Asura Manhwa' } : comic], totalCount: 1 }));
       if (u.pathname === '/api/post') return req.respond(json({ post: comic }));
       if (u.pathname === '/api/chapters') return req.respond(json({ post: { chapters } }));
       if (u.pathname === '/api/chapter') return req.respond(json({ chapter: { id: 1, mangaPostId: 709, price: 0, images: [{ order: 1, url: `https://${host}/upload/2.webp` }, { order: 0, url: `https://${host}/upload/1.webp` }, { order: 2, url: 'https://evil.example/page.webp' }] } }));
@@ -130,6 +132,43 @@ try {
   const text = (sel) => page.$eval(sel, (e) => e.textContent.trim()).catch(() => '');
   const count = (sel) => page.$$eval(sel, (e) => e.length).catch(() => 0);
 
+  console.log('Update notices');
+  check('new release opens an accessible violet status window and traps keyboard focus', await (async () => {
+    await visit('/', '#update-notice');
+    await page.keyboard.press('Tab');
+    return await page.$eval('#update-notice', (el) => {
+      const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
+      const bg = getComputedStyle(dialog).backgroundColor;
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Manga discovery') &&
+        dialog.textContent.includes('provider') && document.activeElement === button && bg.startsWith('rgba(35, 18, 59,');
+    });
+  })());
+  check('release stays visible until acknowledged, then stays dismissed', await (async () => {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const wasVisible = !!(await page.$('#update-notice'));
+    await page.click('#update-notice .update-ok');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    return wasVisible && !(await page.$('#update-notice'));
+  })());
+  check('a new release displays new notes and can be acknowledged', await (async () => {
+    mockNextRelease = true;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const changed = (await text('#update-notice')).includes('New future feature');
+    await page.click('#update-notice .update-ok');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const dismissed = !(await page.$('#update-notice'));
+    mockNextRelease = false;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.click('#update-notice .update-ok'); // restore the actual release after simulating a rollback
+    return changed && dismissed;
+  })());
+  check('release notes can be reopened from the footer', await (async () => {
+    await page.$eval('[data-action="whats-new"]', (el) => el.click());
+    const exists = !!(await page.$('#update-notice'));
+    await page.keyboard.press('Escape');
+    return exists && !(await page.$('#update-notice'));
+  })());
+
   console.log('Anime');
   check('home renders hero + rails', await visit('/', '.hero-slide.active', { shot: 'home' }) && (await count('.rail .card')) > 30);
   check('hero watch action links to the episode', (await page.$eval('.hero-slide.active .hero-actions a', (e) => e.getAttribute('href'))).startsWith('#/watch/'));
@@ -147,6 +186,26 @@ try {
   check('detail strips <script> from synopsis', !(await page.$eval('#desc', (e) => e.innerHTML)).includes('<script') && (await page.$eval('#desc', (e) => e.innerHTML)).includes('<i>unforgettable</i>'));
   check('detail lists episodes', (await count('.ep')) >= 5);
   check('detail omits official streams and trailers', (await count('.stream-link, [data-trailer]')) === 0);
+  check('season picker follows related seasons and displays only aired episodes', await (async () => {
+    await page.waitForFunction(() => document.querySelectorAll('#season-select option').length >= 3, { timeout: 10000 });
+    const eps = await count('.ep');
+    const options = await page.$$eval('#season-select option', (nodes) => nodes.map((o) => o.value));
+    const local = (await text('.notice')).includes('Episode 6') && (await text('.notice')).includes('Provider release times may differ');
+    return eps === 5 && options.includes('1001') && options.includes('1002') && local;
+  })());
+  check('next-airing time uses the viewer timezone', await (async () => {
+    await page.emulateTimezone('Asia/Manila');
+    await visit('/anime/1000', '.notice time');
+    const ok = await page.$eval('.notice', (el) => el.textContent.includes('Asia/Manila') && !!el.querySelector('time')?.dateTime);
+    await page.emulateTimezone('UTC');
+    return ok;
+  })());
+  check('unreleased episodes cannot open a player', await (async () => {
+    await visit('/watch/1004/1', '.empty h3');
+    const ok = (await text('.empty')).includes('No aired episodes listed yet') && !(await page.$('#stage iframe'));
+    await visit('/anime/1000', '.ep');
+    return ok;
+  })());
   check('anime mark toggles once after repeated redraws', await (async () => {
     for (let i = 0; i < 3; i++) { await page.$eval('[data-mark="1"]', (e) => e.click()); }
     const marked = (await page.$eval('[data-mark="1"]', (e) => e.getAttribute('aria-label'))) === 'Mark unwatched';
@@ -187,6 +246,15 @@ try {
     return !(await page.$eval('#markbtn', (e) => e.classList.contains('on')));
   })());
   check('watch page has episode list', (await count('.ep-row')) >= 5);
+  check('watch season switch opens that season and its episodes', await (async () => {
+    await page.waitForSelector('#watch-seasons #season-select', { timeout: 10000 });
+    await page.select('#watch-seasons #season-select', '1001');
+    await page.waitForFunction(() => location.hash.startsWith('#/watch/1001/1'), { timeout: 10000 });
+    await page.waitForSelector('.ep-row');
+    const ok = (await count('.ep-row')) === 24;
+    await visit('/watch/1000/1', '#stage');
+    return ok;
+  })());
   check('episode filter finds episode number', await (async () => {
     await page.type('#episode-search', '3');
     const ok = await page.$eval('.ep-row[data-ep="3"]', (e) => !e.hidden) && await page.$eval('.ep-row[data-ep="2"]', (e) => e.hidden);
@@ -315,6 +383,23 @@ try {
     blockMangaDex = false;
     return shown && sources.length > 0 && message && href === '#/asura/mock-series' && fallbackLink === '#/asura?q=mock';
   })());
+  check('unified manga discovery survives MangaDex 403 and searches providers after opening a title', await (async () => {
+    blockMangaDex = true;
+    await page.evaluate(() => sessionStorage.clear());
+    await visit('/manga', '#comic-grid .card', { timeout: 15000 });
+    const hasAsura = await page.$('#comic-grid a[href^="#/comic/asura/"]');
+    await page.$eval('#comic-grid a[href^="#/comic/asura/"]', (a) => a.click());
+    await page.waitForSelector('#comic-provider-results .ch-list .ch', { timeout: 15000 });
+    const original = await page.$$eval('#comic-provider-results .ch', (links) => links.map((a) => a.getAttribute('href')));
+    await page.$eval('[data-provider="vortex"]', (button) => button.click());
+    await page.waitForSelector('#comic-provider-results [data-match]', { timeout: 15000 });
+    await page.$eval('#comic-provider-results [data-match]', (button) => button.click());
+    await page.waitForSelector('#comic-provider-results .ch-list .ch', { timeout: 15000 });
+    const chapters = await page.$$eval('#comic-provider-results .ch', (links) => links.map((a) => a.getAttribute('href')));
+    const noFire = (await text('#comic-providers')).includes('MangaFire · unavailable');
+    blockMangaDex = false;
+    return !!hasAsura && original.length === 1 && original[0] === '#/asura/mock-series/1' && chapters.length === 1 && chapters[0] === '#/scans/vortex/mock-iken/1' && noFire;
+  })());
   check('manga home', await visit('/manga', '.mhero-slide.active', { shot: 'manga' }) && (await count('.rail .card')) > 30);
   check('manga carousel loads other slides on demand', await (async () => {
     const before = await page.$$eval('.mhero-slide:not(.active) img[data-hero-src]', (imgs) => imgs.length);
@@ -333,6 +418,13 @@ try {
     const images = await page.$$eval('.reader .rpage', (imgs) => imgs.map((img) => img.getAttribute('src')));
     const lazy = await page.$$eval('.reader .rpage', (imgs) => imgs.at(-1)?.getAttribute('loading'));
     return chapterLinks.length === 1 && chapterLinks[0] === '#/asura/mock-series/1' && images.length === 3 && images[0].startsWith('https://cdn.asurascans.com/asura-images/') && lazy === 'lazy';
+  })());
+  check('scan reader history works even when MangaDex is blocked', await (async () => {
+    blockMangaDex = true;
+    await visit('/manga', '#comic-discovery');
+    const found = !!(await page.$('a[href="#/asura/mock-series/1"]'));
+    blockMangaDex = false;
+    return found;
   })());
   for (const source of ['vortex', 'hive']) {
     check(`${source} catalogue and free chapter reader`, await (async () => {
@@ -512,6 +604,12 @@ try {
   check('mobile detail', await visit('/anime/1002', '.detail-title', { shot: 'mobile-anime' }));
   check('no horizontal overflow on mobile', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
+  check('update window fits a small phone and closes with OK', await (async () => {
+    await page.$eval('[data-action="whats-new"]', (el) => el.click());
+    const fits = await page.$eval('.update-window', (el) => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; });
+    await page.click('.update-ok');
+    return fits && !(await page.$('#update-notice'));
+  })());
   check('small phone home stays within viewport', await visit('/', '.hero-slide.active') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   check('small phone watch page stays within viewport', await visit('/watch/1000/1', '#stage') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   check('small phone scan reader stays within viewport', await visit('/scans/vortex/mock-iken/1', '.reader .rpage', { timeout: 10000 }) && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));

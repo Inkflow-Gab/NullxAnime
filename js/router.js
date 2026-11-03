@@ -16,6 +16,7 @@ const routes = [
   ['/scans/:source', () => import('./pages/scans.js'), 'manga'],
   ['/scans/:source/:slug', () => import('./pages/scans.js'), 'manga'],
   ['/scans/:source/:slug/:chapter', () => import('./pages/scans.js'), 'manga'],
+  ['/comic/:source/:slug', () => import('./pages/comic.js'), 'manga'],
   ['/manga/:id', () => import('./pages/mangaDetail.js'), 'manga'],
   ['/read/:id/:chapter', () => import('./pages/reader.js'), 'manga'],
   ['/search', () => import('./pages/search.js'), null],

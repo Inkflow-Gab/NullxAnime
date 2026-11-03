@@ -1,6 +1,6 @@
 // Watch page — episode players and configured third-party providers.
 
-import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
+import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText, fmtLocalDateTime, localTimeZone } from '../util.js';
 import { PROVIDER_ENDPOINTS } from '../config.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
@@ -12,6 +12,7 @@ import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../u
 import { episodeCount, episodeLinkMap } from '../sources.js';
 import { getSettings, setSetting, getMarks, toggleMark, getEntry, saveEntry, pushHistory, getPos, setPos, subscribe } from '../store.js';
 import { go } from '../router.js';
+import { mountSeasonPicker } from '../ui/seasons.js';
 
 export default async function watch(ctx) {
   const id = ctx.params.id;
@@ -23,11 +24,12 @@ export default async function watch(ctx) {
 
   const item = fromAnime(m);
   const count = episodeCount(m);
-  const ep = clamp(parseInt(ctx.params.ep, 10) || 1, 1, Math.max(1, count));
+  if (!count) { ctx.setTitle(item.title); ctx.render(html`<div class="container page"><div class="empty"><h3>No aired episodes listed yet</h3><p>${m.nextAiringEpisode ? `Episode ${m.nextAiringEpisode.episode} is scheduled for ${fmtLocalDateTime(m.nextAiringEpisode.airingAt)} (${localTimeZone()}).` : 'AniList has not reported an aired episode yet.'} Provider availability may differ.</p><a class="btn" href="#/anime/${id}">Back to title</a></div></div>`); return; }
+  const ep = clamp(parseInt(ctx.params.ep, 10) || 1, 1, count);
   if (String(ep) !== ctx.params.ep) { go(`/watch/${id}/${ep}`, { replace: true }); return; }
   const epLinks = episodeLinkMap(m);
   const epInfo = epLinks.get(ep);
-  const isMovie = count === 1;
+  const isMovie = m.format === 'MOVIE';
   const epLabel = isMovie ? 'Full feature' : `Episode ${ep}`;
   ctx.setTitle(`${item.title} — ${epLabel}`);
 
@@ -77,13 +79,16 @@ export default async function watch(ctx) {
         <label class="row switch-row"><span class="switch"><input type="checkbox" id="autonext" ${getSettings().autoNext ? 'checked' : ''}><i></i></span><span>Auto-play the next episode when a video finishes</span></label>
       </div>
       <aside class="watch-side glass">
-        <div class="side-head"><b>${isMovie ? 'Movie' : 'Episodes'}</b><span class="muted" id="seen-count"></span></div>
+        <div id="watch-seasons"></div>
+        ${m.nextAiringEpisode ? html`<p class="watch-airing">Episode ${m.nextAiringEpisode.episode} airs <time datetime="${new Date(m.nextAiringEpisode.airingAt * 1000).toISOString()}">${fmtLocalDateTime(m.nextAiringEpisode.airingAt)}</time> (${localTimeZone()}). Provider release may differ.</p>` : ''}
+        <div class="side-head"><b>${isMovie ? 'Movie' : 'Aired episodes'}</b><span class="muted" id="seen-count"></span></div><p class="watch-airing">Airing data is from AniList; a provider may not have every episode.</p>
         ${count > 1 ? html`<div class="episode-filter"><label class="sr-only" for="episode-search">Filter episodes</label><input class="input" id="episode-search" type="search" placeholder="Find episode or title…" autocomplete="off"><span id="episode-results" class="muted" aria-live="polite"></span></div>` : ''}
         <div class="ep-list" id="eplist">${Array.from({ length: Math.min(count, 1000) }, (_, i) => html`<a class="ep-row" href="#/watch/${id}/${i + 1}" data-ep="${i + 1}"><span class="n">${i + 1}</span><span class="t">${epLinks.get(i + 1)?.name || (isMovie ? 'Full feature' : `Episode ${i + 1}`)}</span><span class="ck"></span></a>`)}</div>
       </aside>
     </div>
   </div>`);
 
+  mountSeasonPicker(ctx, m, '#watch-seasons', true);
   const stage = $('#stage'), panel = $('#panel');
 
   const paintEpisodes = () => {

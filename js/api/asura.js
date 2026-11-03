@@ -1,7 +1,7 @@
 // Asura's JSON catalogue and chapter endpoints. Requests are direct, not a proxy.
 // The API and its availability can change independently of NullxAnime.
 import { cached, MIN } from '../cache.js';
-import { sleep } from '../util.js';
+import { sleep, requestTimeout } from '../util.js';
 
 const API = 'https://api.asurascans.com/api';
 const CDN = 'https://cdn.asurascans.com';
@@ -26,7 +26,7 @@ async function request(path) {
   nextRequest = Date.now() + wait + 1000; // extension's limit: two requests per two seconds
   if (wait) await sleep(wait);
   let response;
-  try { response = await fetch(`${API}${path}`, { credentials: 'omit', headers: { Accept: 'application/json' } }); }
+  try { response = await fetch(`${API}${path}`, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: requestTimeout(15000) }); }
   catch { throw new Error('Asura is unavailable in this browser or region. Try again later.'); }
   if (!response.ok) throw new Error(`Asura returned HTTP ${response.status}. Try again later.`);
   return response.json();
@@ -37,14 +37,15 @@ function series(item) {
     cover: imageUrl(item.cover || item.cover_url || ''),
     description: String(item.description || ''),
     type: String(item.type || 'comic'), status: String(item.status || ''),
-    author: String(item.author || ''), count: Number(item.chapter_count) || 0,
+    author: String(item.author || ''), count: Number(item.chapter_count) || 0, updatedAt: Date.parse(item.last_chapter_at || '') || 0, altTitles: Array.isArray(item.alt_titles) ? item.alt_titles.filter((x) => typeof x === 'string').slice(0, 20) : [],
   };
 }
-export function asuraSearch(query = '', page = 1) {
+export function asuraSearch(query = '', page = 1, sort = 'popular') {
   const q = String(query).trim().slice(0, 150);
   if (!Number.isInteger(page) || page < 1 || page > 500) throw new Error('Invalid page.');
   const offset = (page - 1) * 20;
-  const params = new URLSearchParams({ limit: '20', offset: String(offset), sort: 'popular' });
+  if (!['popular', 'latest'].includes(sort)) throw new Error('Invalid sort.');
+  const params = new URLSearchParams({ limit: '20', offset: String(offset), sort });
   if (q) params.set('search', q);
   return cached(`asura:search:${params}`, 5 * MIN, async () => {
     const body = await request(`/series?${params}`);

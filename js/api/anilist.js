@@ -216,3 +216,38 @@ export function recentEpisodes(from, to, page = 1) {
     return { items: (d.Page?.airingSchedules || []).filter((x) => x.media && !x.media.isAdult && ['TV', 'TV_SHORT', 'ONA', 'OVA', 'MOVIE', 'SPECIAL'].includes(x.media.format)), hasNext: d.Page?.pageInfo?.hasNextPage === true };
   });
 }
+
+/** Follow AniList sequel/prequel edges in bounded batches, not assumed numeric seasons. */
+export function relatedSeasons(media) {
+  return cached(`al:season-graph:${media.id}:v1`, 30 * MIN, async () => {
+    const allowed = new Set(['TV', 'TV_SHORT', 'ONA', 'MOVIE']);
+    const eligible = (m) => m && m.type === 'ANIME' && !m.isAdult && allowed.has(m.format) && Number.isSafeInteger(Number(m.id)) && Number(m.id) > 0;
+    const all = new Map([[Number(media.id), media]]), visited = new Set();
+    let frontier = [Number(media.id)];
+    for (const edge of media.relations?.edges || []) {
+      const m = edge.node;
+      if (['PREQUEL', 'SEQUEL'].includes(edge.relationType) && eligible(m) && all.size < 30 && !all.has(Number(m.id))) { all.set(Number(m.id), m); frontier.push(Number(m.id)); }
+    }
+    if (frontier.length === 1) return [media];
+    for (let depth = 0; depth < 5 && frontier.length && all.size < 30; depth++) {
+      const ids = frontier.filter((id) => !visited.has(id)).slice(0, 20);
+      if (!ids.length) break;
+      ids.forEach((id) => visited.add(id));
+      const query = `query SeasonGraph($ids: [Int]) { Page(perPage: 20) { media(id_in: $ids, type: ANIME) { id relations { edges { relationType(version: 2) node { id type format status episodes seasonYear isAdult title { romaji english native } coverImage { large } startDate { year month day } nextAiringEpisode { episode airingAt timeUntilAiring } } } } } } }`;
+      let data;
+      try { data = await gql(query, { ids }); } catch { break; }
+      const next = [];
+      for (const node of data.Page?.media || []) {
+        for (const edge of node.relations?.edges || []) {
+          const m = edge.node;
+          if (!['PREQUEL', 'SEQUEL'].includes(edge.relationType) || !eligible(m)) continue;
+          const id = Number(m.id);
+          if (!all.has(id) && all.size < 30) { all.set(id, m); next.push(id); }
+        }
+      }
+      frontier = next;
+    }
+    const date = (m) => (m.startDate?.year || m.seasonYear || 9999) * 10000 + (m.startDate?.month || 1) * 100 + (m.startDate?.day || 1);
+    return [...all.values()].sort((a, b) => date(a) - date(b) || Number(a.id) - Number(b.id));
+  });
+}

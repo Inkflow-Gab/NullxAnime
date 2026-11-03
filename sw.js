@@ -1,17 +1,17 @@
 // NullxAnime service worker: app-shell caching so the site opens instantly and works offline (cached pages only).
 // API calls (AniList, MangaDex, Internet Archive) and media are never cached here.
 
-const VERSION = 'nx-v12';
+const VERSION = 'nx-v14';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'css/base.css', 'css/components.css', 'css/pages.css',
   'assets/icon-192.png', 'assets/icon-512.png', 'assets/cover-placeholder.svg', 'assets/release-sigil.svg', 'assets/fonts/Cinzel.ttf',
   'js/main.js', 'js/config.js', 'js/router.js', 'js/util.js', 'js/store.js', 'js/cache.js', 'js/sources.js', 'js/player.js',
   'js/api/anilist.js', 'js/api/asura.js', 'js/api/scans.js', 'js/api/community.js', 'js/api/kitsune.js', 'js/api/mangadex.js', 'js/api/archive.js',
-  'js/ui/device.js', 'js/ui/icons.js', 'js/ui/components.js', 'js/ui/palette.js', 'js/ui/tv.js',
-  'js/pages/home.js', 'js/pages/asura.js', 'js/pages/scans.js', 'js/pages/anime.js', 'js/pages/watch.js', 'js/pages/free.js', 'js/pages/mangaHome.js', 'js/pages/mangaDetail.js',
+  'js/ui/update.js', 'js/ui/comicDiscovery.js', 'js/ui/seasons.js', 'js/ui/device.js', 'js/ui/icons.js', 'js/ui/components.js', 'js/ui/palette.js', 'js/ui/tv.js',
+  'js/pages/comic.js', 'js/pages/home.js', 'js/pages/asura.js', 'js/pages/scans.js', 'js/pages/anime.js', 'js/pages/watch.js', 'js/pages/free.js', 'js/pages/mangaHome.js', 'js/pages/mangaDetail.js',
   'js/pages/reader.js', 'js/pages/releases.js', 'js/pages/search.js', 'js/pages/schedule.js', 'js/pages/library.js', 'js/pages/discover.js', 'js/pages/settings.js', 'js/pages/about.js',
-  'js/data/directory.js',
+  'js/data/directory.js', 'js/data/release.js',
 ];
 
 self.addEventListener('install', (e) => {

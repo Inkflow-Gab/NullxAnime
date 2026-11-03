@@ -1,11 +1,12 @@
 // Anime detail page.
 
-import { html, render, $, $$, on, cleanAniHtml, fmtFuzzyDate, fmtCountdown, fmtDateShort, fmtTime, seasonLabel, titleCase, copyText, hashQuery, fmtNum, safeUrl } from '../util.js';
+import { html, render, $, $$, on, cleanAniHtml, fmtFuzzyDate, fmtCountdown, fmtDateShort, fmtTime, fmtLocalDateTime, localTimeZone, seasonLabel, titleCase, copyText, hashQuery, fmtNum, safeUrl } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { card, rail, fromAnime, titleOf, fmtFormat, fmtStatus, toast, skelRail, errorBox, openLibraryMenu, setStatus, PLACEHOLDER } from '../ui/components.js';
 import { getEntry, saveEntry, getMarks, toggleMark, setMarks, lastHistory, subscribe, statusLabel, STATUSES } from '../store.js';
 import { episodeCount, episodeLinkMap, infoLinks } from '../sources.js';
+import { mountSeasonPicker } from '../ui/seasons.js';
 
 export default async function anime(ctx) {
   const id = ctx.params.id;
@@ -63,7 +64,7 @@ export default async function anime(ctx) {
               ${manga ? html`<a class="btn lg ghost" href="#/search${hashQuery({ type: 'manga', q: titleOf(manga.node) })}">${icon('book')} Read the manga</a>` : ''}
               <button class="btn lg ghost" data-share aria-label="Copy link">${icon('share')}</button>
             </div>
-            ${next ? html`<div class="notice" style="margin-top:16px">${icon('clock')}<div><b>Episode ${next.episode}</b> airs ${fmtDateShort(next.airingAt)} at ${fmtTime(next.airingAt)} — <span data-countdown="${next.airingAt}">${fmtCountdown(next.timeUntilAiring)}</span> from now.</div></div>` : ''}
+            ${next ? html`<div class="notice" style="margin-top:16px">${icon('clock')}<div><b>Episode ${next.episode}</b> is scheduled for <time datetime="${new Date(next.airingAt * 1000).toISOString()}">${fmtLocalDateTime(next.airingAt)}</time> (${localTimeZone()}) — <span data-countdown="${next.airingAt}">${fmtCountdown(next.timeUntilAiring)}</span> from now. Provider release times may differ.</div></div>` : ''}
             <div class="detail-desc ${(m.description || '').length > 420 ? 'collapsed' : ''}" id="desc"><p>${m.description ? cleanAniHtml(m.description) : 'No synopsis available yet.'}</p></div>
             ${(m.description || '').length > 420 ? html`<button class="link-btn" data-more>Read more</button>` : ''}
           </div>
@@ -71,8 +72,9 @@ export default async function anime(ctx) {
 
         <div class="detail-grid">
           <div class="detail-col">
+            <div id="anime-seasons"></div>
             <section class="section" id="episodes">
-              <div class="section-head"><div><h2>${m.format === 'MOVIE' ? 'Watch' : 'Episodes'}</h2><div class="sub">${count ? `${marks.size} of ${count} watched` : 'Episodes will appear once the show is released'}</div></div>
+              <div class="section-head"><div><h2>${m.format === 'MOVIE' ? 'Watch' : 'Episodes'}</h2><div class="sub">${count ? `${marks.size} watched · ${count} aired (provider availability varies)` : 'Episodes will appear once the show is released'}</div></div>
                 ${count > 1 ? html`<div class="row"><button class="btn sm" data-markall>${icon('check')} Mark all watched</button></div>` : ''}</div>
               ${count ? episodeGrid(id, count, epLinks, marks, resumeEp, item) : ''}
             </section>
@@ -111,6 +113,7 @@ export default async function anime(ctx) {
         </div>
       </div>`);
     bind();
+    mountSeasonPicker(ctx, m, '#anime-seasons');
   };
 
   let bindController, countdownTimer;
@@ -178,7 +181,7 @@ function episodeGrid(id, count, epLinks, marks, resumeEp, item) {
     const seen = marks.has(ep);
     return html`<a class="ep ${seen ? 'seen' : ''} ${ep === resumeEp ? 'current' : ''}" href="#/watch/${id}/${ep}">
       ${useThumbs ? html`<span class="ep-thumb"><img loading="lazy" src="${l?.thumbnail || item.cover || PLACEHOLDER}" alt="" referrerpolicy="no-referrer"></span>` : ''}
-      <span class="ep-body"><b>${count === 1 ? 'Full feature' : `Episode ${ep}`}</b>${l?.name ? html`<small class="clamp-2">${l.name}</small>` : ''}</span>
+      <span class="ep-body"><b>${item.raw.format === 'MOVIE' ? 'Full feature' : `Episode ${ep}`}</b>${l?.name ? html`<small class="clamp-2">${l.name}</small>` : ''}</span>
       <button class="ep-check" data-mark="${ep}" aria-label="${seen ? 'Mark unwatched' : 'Mark watched'}" title="${seen ? 'Mark unwatched' : 'Mark watched'}">${icon(seen ? 'check' : 'eye')}</button>
     </a>`;
   })}</div>${count > MAX ? html`<p class="muted" style="margin-top:12px">Showing the first ${MAX} episodes.</p>` : ''}`;

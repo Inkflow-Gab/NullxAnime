@@ -78,3 +78,11 @@ Omega Scans, Vortex Scans and Hivetoons use their public JSON APIs and direct im
 The optional adult setting enables MangaDex adult ratings and Omega's catalogue only after the viewer self-attests they are 18 or older; it is off by default and is not age verification. Turn it off again in Settings. The source controls content and availability.
 
 Aniweeb and the new alternate players are sandboxed against popup and top-level navigation; Instant play offers an optional popup-protection toggle because its provider has refused sandboxed embeds. This may stop new tabs or redirects but **does not remove in-player ads**, and enabling it may break playback. NullxAnime cannot block all ads or browser checks inside a cross-origin player.
+
+### Finding chapters and seasons
+The manga home combines a first page of recently updated titles from Asura, Vortex and MangaDex when each is reachable. Open a title, select a provider, confirm the matching title, and choose an unlocked chapter. Search with another spelling if necessary. Results are not a complete catalogue and provider access can vary by browser or region. Hivetoons is experimental; MangaFire is unavailable because the public services tested did not provide working browser-accessible chapter images. No provider website is embedded.
+
+Anime detail and watch pages show AniList prequel/sequel installments where available. Episode counts for airing shows use AniList's next-airing information and represent episodes that have aired, not confirmed inventory on a player. Airing times use the viewer's device timezone and locale; streaming providers can release at different times.
+
+### Release notifications
+Update `js/data/release.js` with a short title and user-facing changes for each release. The Pages workflow stamps the deployed commit as its release ID, so visitors see the violet update window once per release and can revisit it from “What’s new” in the footer. If curated notes were not changed, the build uses commit titles instead of repeating stale notes. A new service worker offers a reload rather than interrupting playback. Acknowledgement is stored on the device; clearing or blocking local storage can make the window reappear.

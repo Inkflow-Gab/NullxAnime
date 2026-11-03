@@ -62,13 +62,19 @@ export function episodeLinkMap(media) {
   return map;
 }
 
+// AniList's total is often the planned season length, not the number aired.
+// These are aired episode estimates, not verified provider inventory.
 export function episodeCount(m) {
+  if (m.status === 'NOT_YET_RELEASED') return 0;
+  if (m.nextAiringEpisode?.episode > 0) return Math.max(0, Math.min(m.episodes || Infinity, m.nextAiringEpisode.episode - 1));
+  if (m.status === 'RELEASING') {
+    const known = episodeLinkMap(m);
+    return known.size ? Math.max(...known.keys()) : 0;
+  }
   if (m.format === 'MOVIE' || m.format === 'MUSIC') return 1;
   if (m.episodes) return m.episodes;
-  if (m.nextAiringEpisode) return Math.max(1, m.nextAiringEpisode.episode - 1);
-  const map = episodeLinkMap(m);
-  if (map.size) return Math.max(...map.keys());
-  return m.status === 'NOT_YET_RELEASED' ? 0 : 1;
+  const known = episodeLinkMap(m);
+  return known.size ? Math.max(...known.keys()) : 0;
 }
 
 function region() {

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node tests/serve.mjs",
-    "test": "node tests/assets.mjs && node tests/tv.mjs && node tests/device.mjs && node tests/community.mjs && node tests/kitsune.mjs && node tests/streaming.mjs && node tests/e2e.mjs",
+    "test": "node tests/assets.mjs && node tests/seasons.mjs && node tests/tv.mjs && node tests/device.mjs && node tests/community.mjs && node tests/kitsune.mjs && node tests/streaming.mjs && node tests/e2e.mjs",
     "lint": "node --check js/main.js"
   },
   "devDependencies": {

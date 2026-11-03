@@ -83,7 +83,7 @@ export default async function search(ctx) {
       render(suggestions, items.length ? html`${items.map((item) => html`<a class="pal-item" href="${item.href}"><img src="${item.cover || PLACEHOLDER}" alt="" referrerpolicy="no-referrer"><span><span class="t">${item.title}</span><span class="s">${item.sub}</span></span></a>`)}<button type="submit" class="suggest-all">See all results for “${term}”</button>` : html`<p class="suggest-message">No matching ${type} found. Press Search for full results.</p>`);
     } catch {
       if (!ctx.alive() || seq !== suggestionSeq) return;
-      render(suggestions, type === 'manga' ? html`<p class="suggest-message">MangaDex unavailable. <a href="#/asura?q=${encodeURIComponent(term)}">Search Asura instead</a>.</p>` : html`<p class="suggest-message">Suggestions unavailable. Press Search to try again.</p>`);
+      render(suggestions, type === 'manga' ? html`<p class="suggest-message">MangaDex unavailable. <a href="#/manga?q=${encodeURIComponent(term)}">Search other sources</a>.</p>` : html`<p class="suggest-message">Suggestions unavailable. Press Search to try again.</p>`);
     }
     suggestions.hidden = false; input.setAttribute('aria-expanded', 'true');
   }, 300);
@@ -122,7 +122,7 @@ export default async function search(ctx) {
         render(results, html`<div class="muted" style="margin:0 0 14px">${total ? `${total.toLocaleString()} results` : ''}</div><div class="grid" id="grid">${r.items.map((i) => card(i))}</div>`);
       } else $('#grid').insertAdjacentHTML('beforeend', r.items.map((i) => card(i)).join(''));
       more.hidden = !r.hasNext;
-    } catch (e) { if (ctx.alive()) { if (first) render(results, type === 'manga' ? html`${errorBox(e, { title: 'MangaDex is unavailable' })}<div class="row" style="justify-content:center"><a class="btn" href="#/asura?q=${encodeURIComponent(text)}">Search Asura instead</a><a class="btn" href="#/manga">Other manga sources</a></div>` : errorBox(e)); else morebtn.textContent = 'Retry'; } }
+    } catch (e) { if (ctx.alive()) { if (first) render(results, type === 'manga' ? html`${errorBox(e, { title: 'MangaDex is unavailable' })}<div class="row" style="justify-content:center"><a class="btn" href="#/manga?q=${encodeURIComponent(text)}">Search other sources</a><a class="btn" href="#/asura?q=${encodeURIComponent(text)}">Search Asura instead</a><a class="btn" href="#/manga">Other manga sources</a></div>` : errorBox(e)); else morebtn.textContent = 'Retry'; } }
     morebtn.disabled = false;
   };
   morebtn.addEventListener('click', () => { morebtn.textContent = 'Load more'; load(false); });

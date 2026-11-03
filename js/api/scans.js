@@ -1,6 +1,6 @@
 // JSON-based community catalogues. These services control access and may change.
 import { cached, MIN } from '../cache.js';
-import { sleep } from '../util.js';
+import { sleep, requestTimeout } from '../util.js';
 import { getSettings } from '../store.js';
 
 export const SCANS = Object.freeze({
@@ -36,7 +36,7 @@ async function request(source, path) {
   if (wait) await sleep(wait);
   if (config.adult && getSettings().adultManga !== true) throw new Error('Enable 18+ manga in Settings to access this source.');
   let response;
-  try { response = await fetch(config.origin + path, { credentials: 'omit', headers: { Accept: 'application/json' } }); }
+  try { response = await fetch(config.origin + path, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: requestTimeout(15000) }); }
   catch { throw new Error(`${config.label} could not be reached. Browser cross-origin restrictions, a provider check or regional blocking may prevent access.`); }
   if (!response.ok) throw new Error(`${config.label} returned HTTP ${response.status}. Try again later.`);
   try { return await response.json(); } catch { throw new Error(`${config.label} did not return its catalogue. A provider check may be required.`); }
@@ -46,16 +46,17 @@ function omegaSeries(item, config) {
 }
 function ikenSeries(item, config) {
   if (item.isNovel || String(item.seriesType).toUpperCase() === 'NOVEL') return null;
-  return { id: numeric(item.id), slug: id(item.slug), title: String(item.postTitle || 'Untitled'), cover: image(item.featuredImage, config), description: String(item.postContent || ''), status: String(item.seriesStatus || ''), type: String(item.seriesType || 'Comic'), author: String(item.author || '') };
+  return { id: numeric(item.id), slug: id(item.slug), title: String(item.postTitle || 'Untitled'), cover: image(item.featuredImage, config), description: String(item.postContent || ''), status: String(item.seriesStatus || ''), type: String(item.seriesType || 'Comic'), author: String(item.author || ''), updatedAt: Math.max(0, ...(Array.isArray(item.chapters) ? item.chapters : []).filter((c) => !c.isLocked && !c.isTimeLocked && !c.isPermanentlyLocked && !c.isShortLinkLocked && c.isAccessible !== false && Number(c.price || 0) === 0).map((c) => Date.parse(c.createdAt || '') || 0)) };
 }
-export function scansSearch(source, query = '', page = 1) {
+export function scansSearch(source, query = '', page = 1, sort = 'popular') {
   const config = sourceOf(source);
   if (config.adult && getSettings().adultManga !== true) throw new Error('Enable 18+ manga in Settings to access this source.');
   if (!Number.isInteger(page) || page < 1 || page > 500) throw new Error('Invalid page.');
   const q = String(query).trim().slice(0, 150);
+  if (!['popular', 'latest'].includes(sort)) throw new Error('Invalid sort.');
   const params = source === 'omega'
     ? new URLSearchParams({ query_string: q, status: 'All', order: 'desc', orderBy: 'total_views', series_type: 'Comic', page: String(page), perPage: '18', tags_ids: '[]', adult: 'true' })
-    : new URLSearchParams({ searchTerm: q, orderBy: 'totalViews', page: String(page), perPage: '18' });
+    : new URLSearchParams({ searchTerm: q, orderBy: sort === 'latest' ? 'latestChapter' : 'totalViews', page: String(page), perPage: '18' });
   return cached(`scans:${source}:search:${params}`, 5 * MIN, async () => {
     const body = await request(source, `${source === 'omega' ? '/query' : '/api/query'}?${params}`);
     const data = source === 'omega' ? body.data : body.posts;

@@ -45,7 +45,7 @@ const many = (n, off = 0) => Array.from({ length: n }, (_, k) => media(k + off))
 
 export function detail(id) {
   const i = id - 1000;
-  const m = media(i);
+  const m = id === 1004 ? media(i, { status: 'NOT_YET_RELEASED', episodes: 12, nextAiringEpisode: { episode: 1, airingAt: Math.floor(Date.now() / 1000) + 86400, timeUntilAiring: 86400 } }) : media(i);
   return {
     ...m, source: 'MANGA', hashtag: '#frieren', synonyms: ['Frieren'], countryOfOrigin: 'JP', favourites: 48210, siteUrl: `https://anilist.co/anime/${id}`,
     endDate: { year: 2027, month: 3, day: 1 },
@@ -77,6 +77,9 @@ export function anilist(body) {
       fresh: { media: many(8, 8).map((m, k) => ({ ...m, status: 'RELEASING', startDate: { year: 2026, month: 10, day: 10 + k } })) },
       upcoming: { media: many(8, 12).map((m, k) => ({ ...m, status: 'NOT_YET_RELEASED', startDate: { year: 2027, month: 1 + (k % 3), day: 5 + k } })) },
     } };
+  }
+  if (query.includes('SeasonGraph')) {
+    return { data: { Page: { media: variables.ids.map((id) => ({ id, relations: { edges: id === 1000 ? [{ relationType: 'SEQUEL', node: media(1) }] : id === 1001 ? [{ relationType: 'PREQUEL', node: media(0) }, { relationType: 'SEQUEL', node: media(2) }] : [{ relationType: 'PREQUEL', node: media(1) }] } })) } } };
   }
   if (query.includes('GenreCollection')) return { data: { GenreCollection: GENRES.concat(['Hentai']) } };
   if (query.includes('RecentEpisodes')) {

@@ -2,7 +2,7 @@
 import { html, $, cleanAniHtml } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { sourceOf, scansSearch, scansDetails, scansChapters, scansPages } from '../api/scans.js';
-import { getSettings } from '../store.js';
+import { getSettings, pushHistory } from '../store.js';
 import { skelGrid, errorBox, emptyBox, PLACEHOLDER } from '../ui/components.js';
 import { go } from '../router.js';
 
@@ -59,6 +59,7 @@ async function read(ctx, source, config, slug, chapter) {
     const pages = await scansPages(source, slug, chapter, m.id);
     if (!ctx.alive() || (config.adult && getSettings().adultManga !== true)) return;
     const prev = chapters[index - 1], next = chapters[index + 1], current = chapters[index];
+    pushHistory({ type: 'manga', id: `${source}:${slug}`, source, sourceSlug: slug, chapterId: chapter, title: m.title, cover: m.cover, label: current.label, contentRating: config.adult ? 'pornographic' : 'safe' });
     ctx.setTitle(`${m.title} · ${current.label}`);
     document.body.classList.add('reading');
     ctx.cleanup(() => document.body.classList.remove('reading'));
