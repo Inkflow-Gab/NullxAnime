@@ -383,3 +383,10 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .season-picker .select { width: 100%; }
 .season-picker small, .watch-airing { font-size: 12px; line-height: 1.45; }
 .watch-airing { color: var(--text-2); padding: 12px; border-bottom: 1px solid var(--line); }
+.comic-sort { margin: 2px 0 18px; }
+.comic-diagnostic { margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.comic-diagnostic summary { cursor: pointer; font-weight: 700; }
+.comic-diagnostic p { margin: 10px 0; font-size: 13px; }
+.comic-check-list { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+.comic-check-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; }
+.comic-check-list b { color: var(--text); }
