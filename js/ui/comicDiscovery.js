@@ -4,6 +4,7 @@ import { asuraSearch } from '../api/asura.js';
 import { scansSearch } from '../api/scans.js';
 import { listManga } from '../api/mangadex.js';
 import { getSettings } from '../store.js';
+import { PROVIDER_ENDPOINTS } from '../config.js';
 import { icon } from './icons.js';
 import { PLACEHOLDER, skelGrid } from './components.js';
 import { go } from '../router.js';
@@ -11,12 +12,18 @@ import { go } from '../router.js';
 // A manual, read-only check. These are public sample endpoints, not a test of
 // every title. No title searches or reading history are sent to a third party.
 const CHECKS = [
-  { label: 'Asura catalogue', type: 'json', key: 'data', url: 'https://api.asurascans.com/api/series?limit=1&offset=0' },
-  { label: 'Vortex catalogue', type: 'json', key: 'posts', url: 'https://api.vortexscans.org/api/query?perPage=1&page=1' },
+  { label: 'Asura direct catalogue', type: 'json', key: 'data', url: 'https://api.asurascans.com/api/series?limit=1&offset=0' },
+  { label: 'Vortex direct catalogue', type: 'json', key: 'posts', url: 'https://api.vortexscans.org/api/query?perPage=1&page=1' },
   { label: 'MangaDex catalogue', type: 'json', key: 'data', url: 'https://api.mangadex.org/manga?limit=1' },
   { label: 'Asura sample page image', type: 'image', url: 'https://cdn.asurascans.com/asura-images/chapters/martial-god-regressed-to-level-2/1/001.webp?v=1770499638' },
   { label: 'Vortex sample page image', type: 'image', url: 'https://storage.vortexscans.org/upload/series/the-northern-grand-dukes-mad-son-in-law/6f3d5d84-f363-4167-bbd4-bd2aac7fd05d/page-0001_01_1793624791524-376132.webp' },
 ];
+if (PROVIDER_ENDPOINTS.mangaGateway) {
+  const base = PROVIDER_ENDPOINTS.mangaGateway.replace(/\/$/, '');
+  CHECKS.splice(2, 0,
+    { label: 'Asura through relay', type: 'json', key: 'data', url: `${base}/asura/series?limit=1&offset=0` },
+    { label: 'Vortex through relay', type: 'json', key: 'posts', url: `${base}/vortex/api/query?perPage=1&page=1` });
+}
 
 async function checkConnection(test) {
   if (test.type === 'image') return new Promise((resolve) => {
@@ -48,7 +55,7 @@ export async function mountComicDiscovery(ctx) {
     <h2>${q ? `Matches for “${q}”` : sort === 'popular' ? 'Popular manga & manhwa' : 'Recently updated'}</h2>
     <p class="muted comic-help">${sort === 'popular' ? 'Popular results from each source, mixed together; not a single global ranking.' : 'Recent results from each source; ordering is limited to the titles returned.'} Chapter access can change.</p>
     <div id="comic-results">${skelGrid(8)}</div><div id="comic-status" class="muted" role="status"></div>
-    <details class="comic-diagnostic"><summary>Having trouble connecting?</summary><p class="muted">Check sample catalogue connections and page images from this device. This does not test every title. A failure may be caused by the provider, browser, network, or region.</p><button class="btn sm" id="comic-check" type="button">Check connections</button><div id="comic-check-results" role="status" aria-live="polite"></div></details>
+    <details class="comic-diagnostic"><summary>Having trouble connecting?</summary><p class="muted">Check direct and relay catalogue connections and sample page images from this device. Manga searches and chapter requests may go through the relay. This does not test every title. A failure may be caused by the provider, browser, network, or region.</p><button class="btn sm" id="comic-check" type="button">Check connections</button><div id="comic-check-results" role="status" aria-live="polite"></div></details>
   </section>`);
   $('#comic-search', box).addEventListener('submit', (e) => {
     e.preventDefault();

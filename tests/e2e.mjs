@@ -37,6 +37,7 @@ const json = (obj) => ({ status: 200, contentType: 'application/json', headers: 
 
 let mockProviderEndpoints = false;
 let mockMangaGateway = false;
+let useLiveGateway = false;
 let mockNextRelease = false;
 let blockMangaDex = false;
 let blockAllManga = false;
@@ -53,7 +54,7 @@ async function mockNetwork(page) {
     if (gatewayRequest) { const parts = u.pathname.match(/^\/(asura|vortex)(\/.*)$/); if (parts) u = new URL((parts[1] === 'asura' ? 'https://api.asurascans.com/api' : 'https://api.vortexscans.org') + parts[2] + u.search); }
     networkRequests.push(url);
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/data/release.js' && mockNextRelease) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const RELEASE = { id: 'test-next-release', title: 'Future update', changes: ['New future feature'] };" });
-    if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && (mockProviderEndpoints || mockMangaGateway)) return req.respond({ status: 200, contentType: 'text/javascript', body: `export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: '${mockProviderEndpoints ? 'https://kitsune-api.test/api' : ''}', streamWorker: '${mockProviderEndpoints ? 'https://stream.test' : ''}', aniPub: '${mockProviderEndpoints ? 'https://anipub.test' : ''}', mangaGateway: '${mockMangaGateway ? 'https://manga-gateway.test' : ''}' });` });
+    if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && (!useLiveGateway || mockProviderEndpoints || mockMangaGateway)) return req.respond({ status: 200, contentType: 'text/javascript', body: `export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: '${mockProviderEndpoints ? 'https://kitsune-api.test/api' : ''}', streamWorker: '${mockProviderEndpoints ? 'https://stream.test' : ''}', aniPub: '${mockProviderEndpoints ? 'https://anipub.test' : ''}', mangaGateway: '${mockMangaGateway ? 'https://manga-gateway.test' : ''}' });` });
     if (u.origin === new URL(BASE).origin) return req.continue();
     if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'api.aniweeb.net') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Aniweeb episode mock</body></html>' });
@@ -146,7 +147,7 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A new system window') &&
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Manga connection update') &&
         dialog.textContent.includes('connection') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
@@ -458,6 +459,10 @@ try {
     const start = networkRequests.length;
     await visit('/manga', '#comic-grid .card', { timeout: 20000 });
     await page.waitForFunction(() => document.querySelector('#comic-grid a[href^="#/comic/vortex/"]'), { timeout: 20000 });
+    await page.click('.comic-diagnostic summary');
+    await page.click('#comic-check');
+    await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length === 7 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'));
+    const relayChecks = await page.$$eval('#comic-check-results li', (lines) => lines.filter((line) => line.textContent.includes('through relay')).every((line) => line.textContent.includes('Connected')));
     const hasAsura = await page.$('#comic-grid a[href^="#/comic/asura/"]');
     const hasVortex = await page.$('#comic-grid a[href^="#/comic/vortex/"]');
     await visit('/asura/mock-series/1', '.reader .rpage', { timeout: 20000 });
@@ -467,7 +472,7 @@ try {
     const gatewayCalls = networkRequests.slice(start).filter((url) => url.startsWith('https://manga-gateway.test/'));
     mockMangaGateway = false;
     blockAllManga = false;
-    return !!hasAsura && !!hasVortex && asuraPages === 3 && vortexPages === 2 && gatewayCalls.some((url) => url.includes('/asura/series/mock-series/chapters/1')) && gatewayCalls.some((url) => url.includes('/vortex/api/chapter?'));
+    return relayChecks && !!hasAsura && !!hasVortex && asuraPages === 3 && vortexPages === 2 && gatewayCalls.some((url) => url.includes('/asura/series/mock-series/chapters/1')) && gatewayCalls.some((url) => url.includes('/vortex/api/chapter?'));
   })());
 
   check('unified manga discovery survives MangaDex 403 and searches providers after opening a title', await (async () => {
