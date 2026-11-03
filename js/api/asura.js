@@ -1,7 +1,8 @@
-// Asura's JSON catalogue and chapter endpoints. Requests are direct, not a proxy.
+// Asura's JSON catalogue and chapter endpoints, with an optional JSON relay.
 // The API and its availability can change independently of NullxAnime.
 import { cached, MIN } from '../cache.js';
-import { sleep, requestTimeout } from '../util.js';
+import { sleep } from '../util.js';
+import { mangaJSON } from './mangaTransport.js';
 
 const API = 'https://api.asurascans.com/api';
 const CDN = 'https://cdn.asurascans.com';
@@ -25,11 +26,8 @@ async function request(path) {
   const wait = Math.max(0, nextRequest - Date.now());
   nextRequest = Date.now() + wait + 1000; // extension's limit: two requests per two seconds
   if (wait) await sleep(wait);
-  let response;
-  try { response = await fetch(`${API}${path}`, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: requestTimeout(15000) }); }
-  catch { throw new Error('Asura is unavailable in this browser or region. Try again later.'); }
-  if (!response.ok) throw new Error(`Asura returned HTTP ${response.status}. Try again later.`);
-  return response.json();
+  try { return await mangaJSON('asura', `${API}${path}`, path); }
+  catch (error) { if (/^HTTP \d+$/.test(error.message)) throw new Error(`Asura returned ${error.message}. Try again later.`); throw new Error('Asura is unavailable in this browser or region. Try again later.'); }
 }
 function series(item) {
   return {

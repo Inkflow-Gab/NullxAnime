@@ -36,6 +36,7 @@ async function launch() {
 const json = (obj) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(obj) });
 
 let mockProviderEndpoints = false;
+let mockMangaGateway = false;
 let mockNextRelease = false;
 let blockMangaDex = false;
 let blockAllManga = false;
@@ -47,10 +48,12 @@ async function mockNetwork(page) {
   await page.setRequestInterception(true);
   page.on('request', (req) => {
     const url = req.url();
-    const u = new URL(url);
+    let u = new URL(url);
+    const gatewayRequest = u.hostname === 'manga-gateway.test';
+    if (gatewayRequest) { const parts = u.pathname.match(/^\/(asura|vortex)(\/.*)$/); if (parts) u = new URL((parts[1] === 'asura' ? 'https://api.asurascans.com/api' : 'https://api.vortexscans.org') + parts[2] + u.search); }
     networkRequests.push(url);
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/data/release.js' && mockNextRelease) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const RELEASE = { id: 'test-next-release', title: 'Future update', changes: ['New future feature'] };" });
-    if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && mockProviderEndpoints) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: 'https://kitsune-api.test/api', streamWorker: 'https://stream.test', aniPub: 'https://anipub.test' });" });
+    if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && (mockProviderEndpoints || mockMangaGateway)) return req.respond({ status: 200, contentType: 'text/javascript', body: `export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: '${mockProviderEndpoints ? 'https://kitsune-api.test/api' : ''}', streamWorker: '${mockProviderEndpoints ? 'https://stream.test' : ''}', aniPub: '${mockProviderEndpoints ? 'https://anipub.test' : ''}', mangaGateway: '${mockMangaGateway ? 'https://manga-gateway.test' : ''}' });` });
     if (u.origin === new URL(BASE).origin) return req.continue();
     if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'api.aniweeb.net') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Aniweeb episode mock</body></html>' });
@@ -69,7 +72,7 @@ async function mockNetwork(page) {
     if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><iframe src="https://anipub.test/video-embed"></iframe></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname === '/video-embed') return req.respond({ status: 200, contentType: 'text/html', body: 'Episode player mock' });
     if (u.hostname === 'graphql.anilist.co') { const body = req.postData() || '{}'; if (body.includes('RecentEpisodes')) releaseQueries.push(JSON.parse(body)); return req.respond(json(anilist(body))); }
-    if (blockAllManga && ['api.asurascans.com', 'api.vortexscans.org', 'api.mangadex.org'].includes(u.hostname)) return req.respond({ status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' });
+    if (blockAllManga && !gatewayRequest && ['api.asurascans.com', 'api.vortexscans.org', 'api.mangadex.org'].includes(u.hostname)) return req.respond({ status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' });
     if (u.hostname === 'api.asurascans.com') {
       const comic = { slug: 'mock-series', title: 'Mock Asura Manhwa', type: 'manhwa', status: 'ongoing', cover: 'https://cdn.asurascans.com/asura-images/covers/mock.webp', description: '<p>A mock series.</p>', chapter_count: 2 };
       const chapters = [{ number: 2, is_premium: true, page_count: 2 }, { number: 1, is_premium: false, page_count: 3 }];
@@ -143,9 +146,23 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Manga browsing') &&
-        dialog.textContent.includes('connection') && document.activeElement === button && bg.startsWith('rgba(35, 18, 59,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A new system window') &&
+        dialog.textContent.includes('connection') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
+  })());
+  check('system window animates and respects reduced motion', await (async () => {
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'off'));
+    const animated = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'update-glow');
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    const reduced = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'none');
+    await page.emulateMediaFeatures([]);
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'on'));
+    const lightweight = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'update-soft-glow');
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    const lightweightReduced = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'none');
+    await page.emulateMediaFeatures([]);
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'auto'));
+    return animated && reduced && lightweight && lightweightReduced;
   })());
   check('release stays visible until acknowledged, then stays dismissed', await (async () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -432,6 +449,25 @@ try {
     blockAllManga = false;
     blockSampleImage = false;
     return !!failure && lines.slice(0, 3).every((line) => line.includes('HTTP 403')) && lines[3].includes('Could not load') && lines[4].includes('Loaded') && await page.$eval('#comic-check', (button) => !button.disabled);
+  })());
+
+  check('configured manga gateway recovers blocked catalogues and unlocked readers', await (async () => {
+    mockMangaGateway = true;
+    blockAllManga = true;
+    await page.evaluate(() => sessionStorage.clear());
+    const start = networkRequests.length;
+    await visit('/manga', '#comic-grid .card', { timeout: 20000 });
+    await page.waitForFunction(() => document.querySelector('#comic-grid a[href^="#/comic/vortex/"]'), { timeout: 20000 });
+    const hasAsura = await page.$('#comic-grid a[href^="#/comic/asura/"]');
+    const hasVortex = await page.$('#comic-grid a[href^="#/comic/vortex/"]');
+    await visit('/asura/mock-series/1', '.reader .rpage', { timeout: 20000 });
+    const asuraPages = await count('.reader .rpage');
+    await visit('/scans/vortex/mock-iken/1', '.reader .rpage', { timeout: 20000 });
+    const vortexPages = await count('.reader .rpage');
+    const gatewayCalls = networkRequests.slice(start).filter((url) => url.startsWith('https://manga-gateway.test/'));
+    mockMangaGateway = false;
+    blockAllManga = false;
+    return !!hasAsura && !!hasVortex && asuraPages === 3 && vortexPages === 2 && gatewayCalls.some((url) => url.includes('/asura/series/mock-series/chapters/1')) && gatewayCalls.some((url) => url.includes('/vortex/api/chapter?'));
   })());
 
   check('unified manga discovery survives MangaDex 403 and searches providers after opening a title', await (async () => {
