@@ -1,11 +1,11 @@
 // Update this record for every release with the user-facing changes.
 // The Pages workflow stamps the deployed commit as the unique release ID.
 export const RELEASE = Object.freeze({
-  id: '2026-11-manga-relay',
-  title: 'Manga connection update',
+  id: '2026-11-system-breach',
+  title: 'System breach & new players',
   changes: [
-    'Asura and Vortex can use a relay when direct catalogue requests fail.',
-    'The connection check shows both direct and relay results.',
-    'Availability and chapter images still depend on each provider and network.',
+    'The system window opens with a shattering-glass impact and glitch effects.',
+    'MegaVid and Shonen are experimental episode-player choices; playback is not yet verified.',
+    'Animation respects reduced-motion and lightweight device settings.',
   ],
 });

@@ -54,12 +54,21 @@ export const EXTRA_PLAYERS = Object.freeze({
   supaplay: { label: 'SupaPlay', base: 'https://supaplay.fun' },
   aniembed: { label: 'AniEmbed · experimental', base: 'https://aniembed.se' },
   nexus: { label: 'Movies Nexus · experimental', base: 'https://www.moviesnexus.fun' },
+  megavid: { label: 'MegaVid · experimental', base: 'https://megavid.buzz' },
+  shonen: { label: 'Shonen · experimental', base: 'https://shonen.to' },
 });
-export function extraEmbed(provider, id, episode, audio = 'sub') {
+export function extraEmbed(provider, id, episode, audio = 'sub', parentOrigin = '') {
   if (!Object.hasOwn(EXTRA_PLAYERS, provider) || !/^\d+$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || Number(id) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid player, title, episode or audio.');
   const base = EXTRA_PLAYERS[provider].base, title = Number(id);
   if (provider === 'supaplay') return `${base}/stream/ani/${title}/${episode}/${audio}`;
   if (provider === 'aniembed') return `${base}/e/${title}/${episode}?${new URLSearchParams({ lang: audio })}`;
+  if (provider === 'megavid') return `${base}/ani/${title}/${episode}/${audio}`;
+  if (provider === 'shonen') {
+    let origin;
+    try { origin = new URL(parentOrigin); } catch { throw new Error('A valid embedding origin is required.'); }
+    if (origin.origin !== parentOrigin || origin.username || origin.password || !(origin.protocol === 'https:' || (origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname)))) throw new Error('A valid embedding origin is required.');
+    return `${base}/embed/anilist/${title}/${episode}?${new URLSearchParams({ language: audio, parentOrigin })}`;
+  }
   return `${base}/anime/${title}/${episode}/${audio}`;
 }
 
