@@ -167,7 +167,7 @@ export function mediaByIds(ids) {
 
 /* ---------- Fresh episodes, new premieres, upcoming ----------------------------------- */
 const MINI = `id type format status episodes duration season seasonYear averageScore popularity isAdult genres
-  title { romaji english native } coverImage { extraLarge large color } startDate { year month day }
+  title { romaji english native } coverImage { extraLarge large color } bannerImage startDate { year month day }
   nextAiringEpisode { episode airingAt timeUntilAiring }`;
 const ymd = (d) => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 

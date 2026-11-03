@@ -12,4 +12,10 @@ assert.ok(manifest.icons.some((icon) => icon.purpose === 'maskable'));
 const font = await readFile(new URL('../assets/fonts/Cinzel.ttf', import.meta.url));
 assert.equal(font.readUInt32BE(0), 0x00010000);
 assert.ok((await readFile(new URL('../assets/fonts/OFL-Cinzel.txt', import.meta.url), 'utf8')).includes('SIL OPEN FONT LICENSE'));
+for (const name of ['cover-placeholder.svg', 'release-sigil.svg']) {
+  const svg = await readFile(new URL(`../assets/${name}`, import.meta.url), 'utf8');
+  assert.ok(svg.includes('<svg') && svg.includes('viewBox='));
+  assert.ok(!/<(?:script|image|foreignObject)\b/i.test(svg));
+  assert.ok((await readFile(new URL('../sw.js', import.meta.url), 'utf8')).includes(`assets/${name}`));
+}
 console.log('Brand asset checks passed');

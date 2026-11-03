@@ -51,7 +51,7 @@ export function openPalette(initialType) {
   };
   const run = debounce(async () => {
     const q = input.value.trim();
-    const my = ++seq;
+    const my = seq;
     if (q.length < 2) { results = []; drawIdle(); return; }
     render(list, html`<div class="center-load" style="padding:30px"><div class="spinner"></div></div>`);
     try {
@@ -63,12 +63,18 @@ export function openPalette(initialType) {
       if (!items.length) render(list, html`<div class="empty" style="padding:34px 10px"><p>No ${type} found for “${q}”. Press Enter to search everywhere.</p></div>`);
       else draw();
     } catch (e) {
-      if (my === seq) render(list, html`<div class="empty" style="padding:30px 10px"><p>${e.message}</p></div>`);
+      if (my === seq) render(list, type === 'manga' ? html`<div class="empty" style="padding:30px 10px"><p>MangaDex is unavailable. Try another source.</p><a class="btn" href="#/asura?q=${encodeURIComponent(q)}">Search Asura</a><a class="btn" href="#/manga">Manga sources</a></div>` : html`<div class="empty" style="padding:30px 10px"><p>${e.message}</p></div>`);
     }
   }, 280);
 
+  const schedule = () => {
+    ++seq; results = []; sel = -1; run.cancel();
+    if (input.value.trim().length < 2) drawIdle();
+    else { render(list, html`<div class="center-load" style="padding:30px"><div class="spinner"></div></div>`); run(); }
+  };
+
   const close = () => {
-    open = false; el.remove(); document.body.classList.remove('no-scroll');
+    ++seq; run.cancel(); open = false; el.remove(); document.body.classList.remove('no-scroll');
     document.removeEventListener('keydown', onKey, true);
   };
   const submit = () => {
@@ -81,18 +87,18 @@ export function openPalette(initialType) {
     else if (e.key === 'ArrowDown' && results.length) { e.preventDefault(); sel = (sel + 1) % results.length; draw(); $('.pal-item.sel', el)?.scrollIntoView({ block: 'nearest' }); }
     else if (e.key === 'ArrowUp' && results.length) { e.preventDefault(); sel = (sel - 1 + results.length) % results.length; draw(); $('.pal-item.sel', el)?.scrollIntoView({ block: 'nearest' }); }
     else if (e.key === 'Enter') { e.preventDefault(); submit(); }
-    else if (e.key === 'Tab' && e.shiftKey === false && document.activeElement === input) { e.preventDefault(); type = type === 'anime' ? 'manga' : 'anime'; paint(); run(); }
+    else if (e.key === 'Tab' && e.shiftKey === false && document.activeElement === input) { e.preventDefault(); type = type === 'anime' ? 'manga' : 'anime'; paint(); schedule(); }
   };
   document.addEventListener('keydown', onKey, true);
   el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
   el.addEventListener('click', (e) => {
     const seg = e.target.closest('#pal-seg button');
-    if (seg) { type = seg.dataset.t; paint(); run(); input.focus(); return; }
+    if (seg) { type = seg.dataset.t; paint(); schedule(); input.focus(); return; }
     if (e.target.closest('[data-clear]')) { clearSearches(); drawIdle(); return; }
     const rec = e.target.closest('[data-q]');
-    if (rec) { input.value = rec.dataset.q; run(); input.focus(); return; }
-    if (e.target.closest('a.pal-item')) { pushSearch(input.value); close(); }
+    if (rec) { input.value = rec.dataset.q; schedule(); input.focus(); return; }
+    if (e.target.closest('a[href^="#/"]')) { pushSearch(input.value); close(); }
   });
-  input.addEventListener('input', run);
+  input.addEventListener('input', schedule);
   paint(); drawIdle(); input.focus();
 }

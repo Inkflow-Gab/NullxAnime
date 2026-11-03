@@ -4,8 +4,7 @@ import { html, raw, $, $$, on, fmtCountdown, fmtNum, titleCase, seasonLabel, esc
 import { icon } from './icons.js';
 import { getSettings, getEntry, saveEntry, removeEntry, STATUSES, statusLabel, subscribe, getPos } from '../store.js';
 
-export const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300"><rect width="200" height="300" fill="#1d1d2d"/><path d="M70 190l25-32 20 24 15-18 30 36H70z" fill="#2c2c44"/><circle cx="82" cy="128" r="12" fill="#2c2c44"/></svg>');
+export const PLACEHOLDER = new URL('../../assets/cover-placeholder.svg', import.meta.url).href;
 
 /* ---------- Normalised "items" ----------------------------------------------------- */
 const registry = new Map();
@@ -200,7 +199,7 @@ export function bindGlobalUi() {
   // broken images fall back to a placeholder instead of a broken icon
   document.addEventListener('error', (e) => {
     const t = e.target;
-    if (t instanceof HTMLImageElement && !t.dataset.failed) { t.dataset.failed = '1'; t.src = PLACEHOLDER; }
+    if (t instanceof HTMLImageElement && !t.classList.contains('rpage') && !t.dataset.failed) { t.dataset.failed = '1'; t.src = PLACEHOLDER; }
   }, true);
   subscribe((kind) => { if (kind === 'library' || kind === 'import') syncQuick(); });
 }

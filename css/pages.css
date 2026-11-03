@@ -350,3 +350,23 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .asura-poster { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius); }
 .asura-detail .detail-desc { margin: 16px 0; }
 @media (max-width: 600px) { .asura-detail { grid-template-columns: 110px 1fr; gap: 14px; } }
+
+/* Readable, continuously ordered release blocks. */
+.release-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 22px 16px; }
+.release-grid .poster { aspect-ratio: 16 / 9; }
+.release-grid .title { font-size: 15px; }
+@media (max-width: 600px) {
+  .release-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 10px; }
+}
+/* The preview stays attached to its search field, above the filter controls. */
+.search-suggestions { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; max-height: min(55vh, 430px); overflow: auto; padding: 6px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: var(--shadow); }
+.search-suggestions[hidden] { display: none; }
+.search-suggestions .pal-item span.t, .search-suggestions .pal-item span.s { display: block; }
+.suggest-message { padding: 12px; color: var(--muted); font-size: 13px; }
+.suggest-message a { color: var(--accent); }
+.suggest-all { display: block; width: 100%; padding: 10px; text-align: left; color: var(--accent); font-weight: 650; }
+.release-head { position: relative; overflow: hidden; padding: clamp(20px, 4vw, 34px); border: 1px solid var(--line-2); border-radius: 20px; background: linear-gradient(115deg, rgba(var(--accent-rgb), .19), transparent 72%), var(--surface); }
+.release-head::after { content: ''; position: absolute; pointer-events: none; right: 3%; top: -55%; width: 230px; height: 230px; background: url('../assets/release-sigil.svg') center / contain no-repeat; opacity: .8; }
+.release-head > * { position: relative; z-index: 1; }
+.release-kicker { display: block; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .14em; margin-bottom: 8px; }
+.release-head p { color: var(--text-2); }

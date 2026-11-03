@@ -30,3 +30,5 @@ jobs:
         run: node tests/live-extra-players.mjs
       - name: Probe browser access to reading sources (non-blocking)
         run: node tests/live-readers.mjs
+      - name: Probe chronological releases (non-blocking)
+        run: node tests/live-releases.mjs

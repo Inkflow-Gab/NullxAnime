@@ -1,7 +1,7 @@
 {
   "name": "NullxAnime",
   "short_name": "NullxAnime",
-  "description": "Anime and manga discovery, tracking and reading. No captcha, no ads, no account.",
+  "description": "Anime and manga discovery, tracking and reading. No account required; third-party players may contain ads.",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
