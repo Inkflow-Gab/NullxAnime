@@ -115,11 +115,11 @@ export const skelRail = (n = 8) => html`<section class="section"><div class="sec
 export const skelGrid = (n = 18) => html`<div class="grid">${Array.from({ length: n }, skelCard)}</div>`;
 export const loading = () => html`<div class="center-load"><div class="spinner"></div></div>`;
 
-export function errorBox(err, { title = 'Something went wrong' } = {}) {
+export function errorBox(err, { title = 'Something went wrong', action = 'retry', button = 'Try again' } = {}) {
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   const msg = offline ? 'You appear to be offline. Check your connection and try again.' : (err?.message || String(err || 'Unknown error'));
   return html`<div class="empty">${icon(offline ? 'wifiOff' : 'alert')}<h3>${offline ? 'You are offline' : title}</h3><p>${msg}</p>
-    <button class="btn primary" data-action="retry">${icon('refresh')} Try again</button></div>`;
+    <button class="btn primary" data-action="${action}">${icon('refresh')} ${button}</button></div>`;
 }
 export const emptyBox = (iconName, title, text, action = '') => html`<div class="empty">${icon(iconName)}<h3>${title}</h3><p>${text}</p>${action}</div>`;
 

@@ -139,26 +139,31 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Manga discovery') &&
-        dialog.textContent.includes('provider') && document.activeElement === button && bg.startsWith('rgba(35, 18, 59,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('reliable update') &&
+        dialog.textContent.includes('older and newer files') && document.activeElement === button && bg.startsWith('rgba(35, 18, 59,');
     });
   })());
   check('release stays visible until acknowledged, then stays dismissed', await (async () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#update-notice');
     const wasVisible = !!(await page.$('#update-notice'));
     await page.click('#update-notice .update-ok');
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#app .route-root');
     return wasVisible && !(await page.$('#update-notice'));
   })());
   check('a new release displays new notes and can be acknowledged', await (async () => {
     mockNextRelease = true;
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#update-notice');
     const changed = (await text('#update-notice')).includes('New future feature');
     await page.click('#update-notice .update-ok');
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#app .route-root');
     const dismissed = !(await page.$('#update-notice'));
     mockNextRelease = false;
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#update-notice .update-ok');
     await page.click('#update-notice .update-ok'); // restore the actual release after simulating a rollback
     return changed && dismissed;
   })());

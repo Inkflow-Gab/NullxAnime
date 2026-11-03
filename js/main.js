@@ -64,6 +64,7 @@ new MutationObserver(updateTopbar).observe(document.body, { attributes: true, at
 /* ----- global clicks ----- */
 on(document, 'click', '[data-action="search"]', () => openPalette());
 on(document, 'click', '[data-action="retry"]', () => reload());
+on(document, 'click', '[data-action="reload-app"]', () => location.reload());
 on(document, 'click', '[data-action="shortcuts"]', () => showShortcuts());
 on(document, 'click', '[data-action="whats-new"]', () => showUpdateWindow({ force: true }));
 
@@ -111,11 +112,32 @@ window.addEventListener('online', () => toast('Back online'));
 /* ----- PWA ----- */
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !/[?&]nosw/.test(location.search)) {
   let hasController = !!navigator.serviceWorker.controller;
+  let registration, applying = false;
+  const applyUpdate = () => {
+    if (registration?.waiting) {
+      applying = true;
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      // If activation is blocked, a normal reload is still safe on the old shell.
+      setTimeout(() => { if (applying) location.reload(); }, 10000);
+    } else location.reload();
+  };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hasController) notifyUpdateReady();
+    if (applying) { applying = false; location.reload(); return; }
+    if (hasController) notifyUpdateReady(applyUpdate);
     hasController = true;
   });
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  const registerWorker = () => navigator.serviceWorker.register('sw.js').then((reg) => {
+    registration = reg;
+    if (reg.waiting && navigator.serviceWorker.controller) notifyUpdateReady(applyUpdate);
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      worker?.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) notifyUpdateReady(applyUpdate);
+      });
+    });
+  }).catch(() => {});
+  if (document.readyState === 'complete') registerWorker();
+  else window.addEventListener('load', registerWorker, { once: true });
 }
 window.__deferredInstall = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__deferredInstall = e; });

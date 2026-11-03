@@ -48,13 +48,13 @@ export function showUpdateWindow({ force = false } = {}) {
 }
 
 // Do not interrupt a reader/player with a forced reload when a new shell arrives.
-export function notifyUpdateReady() {
+export function notifyUpdateReady(applyUpdate = () => location.reload()) {
   if ($('#update-ready')) return;
   const el = document.createElement('div');
   el.id = 'update-ready';
   el.className = 'update-ready';
   el.setAttribute('role', 'status');
   el.innerHTML = html`<span>A new update is ready.</span><button type="button">Reload to see what changed</button>`.toString();
-  $('button', el).addEventListener('click', () => location.reload());
+  $('button', el).addEventListener('click', applyUpdate);
   document.body.appendChild(el);
 }

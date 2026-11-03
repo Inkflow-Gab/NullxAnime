@@ -86,3 +86,6 @@ Anime detail and watch pages show AniList prequel/sequel installments where avai
 
 ### Release notifications
 Update `js/data/release.js` with a short title and user-facing changes for each release. The Pages workflow stamps the deployed commit as its release ID, so visitors see the violet update window once per release and can revisit it from “What’s new” in the footer. If curated notes were not changed, the build uses commit titles instead of repeating stale notes. A new service worker offers a reload rather than interrupting playback. Acknowledgement is stored on the device; clearing or blocking local storage can make the window reappear.
+
+### App update recovery
+The service worker keeps each release's app files together instead of refreshing modules independently. During the one-time migration from the older cache, open app tabs reload to repair mixed files; browser library, settings and reading history are not deleted. Later updates wait for you to reload, and other open tabs keep using their original version until they reload. If an app module cannot load, the recovery button performs a full page reload.
