@@ -31,6 +31,9 @@ try {
       const catalogue = await get('/asura/series?limit=1&offset=0&sort=popular');
       if (!catalogue.data?.length) throw new Error('Empty catalogue');
       await wait(1100);
+      const details = await get('/asura/series/martial-god-regressed-to-level-2');
+      if (details.series?.slug !== 'martial-god-regressed-to-level-2') throw new Error('Invalid series details');
+      await wait(1100);
       const chapters = await get('/asura/series/martial-god-regressed-to-level-2/chapters');
       if (!chapters.data?.some((c) => String(c.number) === '1' && !c.is_premium && (!c.early_access_until || Date.parse(c.early_access_until) <= Date.now()))) throw new Error('Sample chapter is locked or missing');
       await wait(1100);
@@ -41,6 +44,9 @@ try {
     ['Vortex', async () => {
       const catalogue = await get('/vortex/api/query?perPage=1&page=1&orderBy=totalViews');
       if (!catalogue.posts?.length) throw new Error('Empty catalogue');
+      await wait(1100);
+      const details = await get('/vortex/api/post?postSlug=the-northern-grand-dukes-mad-son-in-law');
+      if (String(details.post?.id) !== '709') throw new Error('Invalid series details');
       await wait(1100);
       const chapters = await get('/vortex/api/chapters?postId=709');
       if (!chapters.post?.chapters?.some((c) => String(c.id) === '34639' && !c.isLocked && !c.isTimeLocked && !c.isPermanentlyLocked && !c.isShortLinkLocked && c.isAccessible !== false && Number(c.price || 0) === 0)) throw new Error('Sample chapter is locked or missing');
@@ -53,7 +59,7 @@ try {
   ];
   let failed = false;
   for (const [name, probe] of probes) {
-    try { await probe(); note('notice', `${name} relay: catalogue, unlocked chapter metadata and sample page image loaded from the Pages origin.`); }
+    try { await probe(); note('notice', `${name} relay: catalogue, series details, unlocked chapter metadata and sample page image loaded from the Pages origin.`); }
     catch (e) { failed = true; note('warning', `${name} relay live probe failed: ${e.message}.`); }
   }
   if (failed) process.exitCode = 1;
