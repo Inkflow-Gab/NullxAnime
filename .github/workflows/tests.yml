@@ -18,6 +18,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Probe manga relay from Pages origin (non-blocking)
+        continue-on-error: true
+        run: node tests/live-manga-gateway.mjs
       - run: npm run lint
       - run: npm test
       - name: Check instant provider reachability (non-blocking)
@@ -30,8 +33,5 @@ jobs:
         run: node tests/live-extra-players.mjs
       - name: Probe browser access to reading sources (non-blocking)
         run: node tests/live-readers.mjs
-      - name: Probe manga relay from Pages origin (non-blocking)
-        continue-on-error: true
-        run: node tests/live-manga-gateway.mjs
       - name: Probe chronological releases (non-blocking)
         run: node tests/live-releases.mjs

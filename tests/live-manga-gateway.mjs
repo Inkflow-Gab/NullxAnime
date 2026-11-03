@@ -15,7 +15,7 @@ try {
   await page.goto(PROBE, { waitUntil: 'domcontentloaded', timeout: 15000 });
   const get = (path) => page.evaluate(async (url) => {
     const res = await fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(18000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) { const text = (await res.text()).slice(0, 200); throw new Error(`HTTP ${res.status}: ${text}`); }
     return res.json();
   }, BASE + path);
   const image = (url, expectedOrigin) => page.evaluate(([u, allowed]) => new Promise((resolve) => {
@@ -25,6 +25,7 @@ try {
     img.onload = () => { clearTimeout(timer); resolve(img.naturalWidth > 0); };
     img.onerror = () => { clearTimeout(timer); resolve(false); }; img.src = u;
   }), [url, expectedOrigin]);
+  try { await get('/invalid'); note('warning', 'Relay origin check returned an unexpected success.'); } catch (e) { note('notice', `Relay origin/path check: ${e.message}`); }
   const probes = [
     ['Asura', async () => {
       const catalogue = await get('/asura/series?limit=1&offset=0&sort=popular');
