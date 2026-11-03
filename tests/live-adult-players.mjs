@@ -6,7 +6,7 @@ import chromium from '@sparticuz/chromium';
 const note = (level, message) => console.log(`::${level}::${message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 let browser;
 try {
-  const query = `{ Page(page: 1, perPage: 5) { media(type: ANIME, isAdult: true, tag: "Primarily Adult Cast", status: FINISHED, sort: POPULARITY_DESC) { id episodes title { romaji english } } } }`;
+  const query = `{ Page(page: 1, perPage: 5) { media(type: ANIME, isAdult: true, tag: "Primarily Adult Cast", status: FINISHED, sort: POPULARITY_DESC) { id episodes duration title { romaji english } } } }`;
   const response = await fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query }), signal: AbortSignal.timeout(15000) });
   const json = await response.json();
   const sample = json.data?.Page?.media?.find((m) => m.id && m.episodes > 0 && (m.title?.romaji || m.title?.english));
@@ -40,15 +40,16 @@ try {
         document.querySelectorAll('video').forEach((v) => { v.muted = true; v.play().catch(() => {}); });
       }).catch(() => {});
       await new Promise((resolve) => setTimeout(resolve, 12000));
-      const result = await root.evaluate((titles) => {
+      const result = await root.evaluate(({ titles, duration }) => {
         const clean = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
         const body = clean(document.body?.innerText || ''), title = clean(document.title);
         const identity = titles.some((name) => { const n = clean(name); return n.length >= 8 && (body.includes(n) || title.includes(n)); });
-        const progress = [...document.querySelectorAll('video')].some((v) => v.readyState >= 2 && v.currentTime > 1 && !v.error);
-        return { identity, progress };
-      }, [sample.title.romaji, sample.title.english]).catch(() => ({ identity: false, progress: false }));
-      const verified = result.identity && result.progress;
-      note(verified ? 'notice' : 'warning', `${name} adult sample: ${verified ? 'observed title and video progress' : 'not verified'} (identity ${result.identity}, root-frame video progress ${result.progress}). This sample does not establish availability for other titles.`);
+        const videos = [...document.querySelectorAll('video')];
+        const progress = videos.some((v) => v.readyState >= 2 && v.currentTime > 1 && !v.error);
+        const durationMatch = !!duration && videos.some((v) => v.readyState >= 2 && v.currentTime > 1 && Number.isFinite(v.duration) && v.duration >= 300 && Math.abs(v.duration / 60 - duration) <= Math.max(3, duration * .2));
+        return { identity, progress, durationMatch, durations: videos.map((v) => Number.isFinite(v.duration) ? Math.round(v.duration) : 0) };
+      }, { titles: [sample.title.romaji, sample.title.english], duration: sample.duration }).catch(() => ({ identity: false, progress: false, durationMatch: false, durations: [] }));
+      note(result.identity && result.progress ? 'notice' : 'warning', `${name} adult sample: identity ${result.identity}, video progress ${result.progress}, expected-length match ${result.durationMatch} (expected ${sample.duration || 'unknown'} min; video seconds ${result.durations.join(',') || 'none'}). Duration or progress alone cannot confirm the correct episode.`);
     } catch (error) { note('warning', `${name} adult sample could not be tested: ${error.message}`); }
     finally { await page.close(); }
   }));
