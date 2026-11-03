@@ -13,9 +13,7 @@ try {
   await page.setRequestInterception(true);
   page.on('request', (req) => req.url() === PROBE ? req.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Gateway probe</title>' }) : req.continue());
   await page.goto(PROBE, { waitUntil: 'domcontentloaded', timeout: 15000 });
-  note('notice', `Probe document origin: ${await page.evaluate(() => location.origin)}`);
-  page.on('request', (req) => { if (req.url().startsWith(BASE)) note('notice', `Gateway request origin header: ${req.headers().origin || '(none)'}`); });
-  page.on('response', (res) => { if (res.url().startsWith(BASE)) note('notice', `Gateway response status=${res.status()} allow-origin=${res.headers()['access-control-allow-origin'] || '(none)'}`); });
+  if (await page.evaluate(() => location.origin) !== 'https://inkflow-gab.github.io') throw new Error('Unexpected probe origin');
   const get = (path) => page.evaluate(async (url) => {
     const res = await fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(18000) });
     if (!res.ok) { const text = (await res.text()).slice(0, 200); throw new Error(`HTTP ${res.status}: ${text}`); }
@@ -28,7 +26,6 @@ try {
     img.onload = () => { clearTimeout(timer); resolve(img.naturalWidth > 0); };
     img.onerror = () => { clearTimeout(timer); resolve(false); }; img.src = u;
   }), [url, expectedOrigin]);
-  try { await get('/invalid'); note('warning', 'Relay origin check returned an unexpected success.'); } catch (e) { note('notice', `Relay origin/path check: ${e.message}`); }
   const probes = [
     ['Asura', async () => {
       const catalogue = await get('/asura/series?limit=1&offset=0&sort=popular');
