@@ -626,6 +626,7 @@ try {
     const nav = await count('[data-nav="adult"]') === 2;
     const adultBadge = (await text('#adult-grid .card')).includes('18+');
     await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
+    await page.waitForSelector('#tabbar [data-nav="adult"]', { timeout: 10000 });
     const mobileNav = await page.$eval('#tabbar [data-nav="adult"]', (el) => { const r = el.getBoundingClientRect(); return getComputedStyle(el.parentElement).display === 'flex' && r.left >= 0 && r.right <= innerWidth; });
     await page.setViewport({ width: 1440, height: 900 });
     await visit('/watch/1099/1', '#markbtn');
