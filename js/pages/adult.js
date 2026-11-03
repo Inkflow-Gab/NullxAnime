@@ -25,12 +25,8 @@ export default function adult(ctx) {
   const state = { q, sort: sort === 'popular' ? '' : sort, genre, format, status };
   const link = (patch = {}) => `/adult${hashQuery({ ...state, ...patch })}`;
   const filtered = !!(q || genre || format || status || sort !== 'popular');
-  ctx.render(html`<div class="container page adult-page"><div class="adult-heading"><span class="chip active">18+ · OPT-IN</span><h1 class="page-title">Hentai</h1><p class="muted">Explore adult anime metadata from AniList. Playback depends on third-party players and has not been verified for adult titles.</p></div>
+  ctx.render(html`<div class="container page adult-page"><div class="adult-heading"><span class="chip active">18+ · OPT-IN</span><h1 class="page-title">Hentai</h1><p class="muted">Choose a title to try its in-page 18+ servers. AniList supplies metadata; third-party playback and episode matching are not guaranteed.</p></div>
     <nav class="row adult-links" aria-label="Adult catalogues"><a class="btn" href="#/search?type=manga&amp;rating=adult">18+ manga on MangaDex</a><a class="btn" href="#/scans/omega">Omega Scans</a><a class="btn ghost" href="#/settings">18+ settings</a></nav>
-    <details class="adult-sources"><summary>External adult sites &amp; uncensored category</summary>
-      <p class="muted">These links open third-party sites, not an integrated player. Their content, ads, availability and edition labels are controlled by each site. Check the title and episode there.</p>
-      <div class="row"><a class="btn sm" href="https://hentaihaven.xxx/" target="_blank" rel="noopener noreferrer">Hentai Haven ↗</a><a class="btn sm" href="https://hanime.tv/" target="_blank" rel="noopener noreferrer">Hanime ↗</a><a class="btn sm" href="https://hentaigasm.com/" target="_blank" rel="noopener noreferrer">Hentaigasm ↗</a><a class="btn sm" href="https://hentaigasm.com/genre/uncensored/" target="_blank" rel="noopener noreferrer">Hentaigasm · Uncensored ↗</a></div>
-    </details>
     <section class="adult-explore" aria-label="Adult anime search and filters">
       <form id="adult-search" class="adult-search"><label for="adult-query">Search adult anime</label><div class="adult-search-row"><input id="adult-query" class="input" value="${q}" placeholder="Search by title" maxlength="150"><button class="btn primary">Search</button></div></form>
       <nav class="adult-sort" aria-label="Sort adult anime">${Object.entries(SORTS).map(([key, [label]]) => html`<a href="#${link({ sort: key === 'popular' ? '' : key })}" class="${sort === key ? 'on' : ''}" ${sort === key ? html`aria-current="page"` : ''}>${label}</a>`)}</nav>

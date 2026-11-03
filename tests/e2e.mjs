@@ -148,7 +148,7 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('More ways to discover') &&
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('In-page adult servers') &&
         dialog.textContent.includes('not verified') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
@@ -626,7 +626,7 @@ try {
     await page.$eval('#adult-answer', (e, n) => { e.value = n; }, answer);
     await page.$eval('#adult-gate', (e) => e.requestSubmit());
     await visit('/adult', '#adult-grid .card');
-    const externalLinks = await page.$$eval('.adult-sources a', (links) => links.length === 4 && links.every((a) => a.target === '_blank' && a.rel.includes('noopener') && a.rel.includes('noreferrer')) && links.some((a) => a.href === 'https://hentaigasm.com/genre/uncensored/'));
+    const noExternalLinks = await count('.adult-sources a') === 0;
     const defaultQuery = adultQueries.at(-1);
     const defaultCorrect = defaultQuery?.variables.sort[0] === 'POPULARITY_DESC';
     await page.$eval('.adult-sort a[href*="sort=latest"]', (e) => e.click());
@@ -657,6 +657,10 @@ try {
     const mobileNav = await page.$eval('#tabbar [data-nav="adult"]', (el) => { const r = el.getBoundingClientRect(); return getComputedStyle(el.parentElement).display === 'flex' && r.left >= 0 && r.right <= innerWidth; });
     await page.setViewport({ width: 1440, height: 900 });
     await visit('/watch/1099/1', '#markbtn');
+    const adultServer = await page.$eval('#stage iframe', (e) => e.src === 'https://megavid.buzz/ani/1099/1/sub' && e.hasAttribute('sandbox'));
+    const separated = (await text('.adult-player-notice')).includes('not verified') && await count('#tabs [data-src="library"]') === 0 && await count('#tabs [data-src="megavid"]') === 1;
+    await page.$eval('#tabs [data-src="supaplay"]', (e) => e.click());
+    const switched = await page.$eval('#stage iframe', (e) => e.src === 'https://supaplay.fun/stream/ani/1099/1/sub' && e.hasAttribute('sandbox'));
     await page.$eval('#markbtn', (e) => e.click());
     await visit('/search?type=manga&rating=adult', '.grid .card');
     const badge = (await text('.grid .card')).includes('18+');
@@ -677,7 +681,7 @@ try {
     await page.$eval('[data-tg="adultManga"]', (e) => e.click());
     const hidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('manga').some((h) => h.contentRating === 'erotica'));
     const animeHidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('anime').some((h) => h.id === '1099') && !(await import('./js/store.js')).allEntries('anime').some((e) => e.id === '1099'));
-    return badge && requested && pages && hidden && omegaOk && nav && mobileNav && adultBadge && animeHidden && filtersOk && externalLinks;
+    return badge && requested && pages && hidden && omegaOk && nav && mobileNav && adultBadge && animeHidden && filtersOk && noExternalLinks && adultServer && separated && switched;
   })());
 
   check('backup import never enables adult mode', await (async () => {

@@ -38,7 +38,7 @@ export default async function watch(ctx) {
   if (e0 && e0.status === 'planning') saveEntry('anime', id, { status: 'current' });
 
   const posKey = `a:${id}:${ep}`;
-  const tabs = [
+  const normalTabs = [
     ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
     ...(count > 0 ? [{ id: 'aniweeb', kind: 'aniweeb', label: 'Aniweeb', note: 'Alternate episode player' }] : []),
     ...(count > 0 ? Object.entries(EXTRA_PLAYERS).map(([id, p]) => ({ id, kind: 'extra', label: p.label, note: 'Third-party episode player' })) : []),
@@ -48,7 +48,18 @@ export default async function watch(ctx) {
     ...(PROVIDER_ENDPOINTS.aniPub ? [{ id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'AniPub episode source' }] : []),
     { id: 'library', kind: 'library', label: 'Free library', note: 'Public-domain & Creative Commons (Internet Archive)' },
   ];
-  const defaultTab = tabs.find((s) => s.id === 'instant') || tabs.find((s) => s.id === 'library');
+  // Adult titles use an isolated in-page server list. No server can be guaranteed
+  // for every title; the first one showed progress in a live adult sample only.
+  const adultTabs = [
+    { id: 'megavid', kind: 'extra', label: 'MegaVid · experimental', note: 'Adult playback is not verified for this title' },
+    { id: 'supaplay', kind: 'extra', label: 'SupaPlay · experimental', note: 'Adult playback is not verified' },
+    { id: 'instant', kind: 'instant', label: 'MegaPlay · experimental', note: 'Adult playback is not verified' },
+    { id: 'aniweeb', kind: 'aniweeb', label: 'Aniweeb · experimental', note: 'Adult playback is not verified' },
+    { id: 'aniembed', kind: 'extra', label: 'AniEmbed · experimental', note: 'Adult playback is not verified' },
+    { id: 'shonen', kind: 'extra', label: 'Shonen · experimental', note: 'Adult playback is not verified' },
+  ];
+  const tabs = m.isAdult ? adultTabs : normalTabs;
+  const defaultTab = m.isAdult ? tabs[0] : tabs.find((s) => s.id === 'instant') || tabs.find((s) => s.id === 'library');
   let active = tabs.find((t) => t.id === ctx.query.src) || defaultTab;
   let player = null;
   const killPlayer = () => { player?.destroy(); player = null; };
@@ -66,7 +77,8 @@ export default async function watch(ctx) {
     <div class="watch">
       <div class="watch-main">
         <div class="stage-wrap"><div class="stage" id="stage"></div></div>
-        <div class="source-tabs tabs-scroll" id="tabs" role="tablist"></div>
+        ${m.isAdult ? html`<div class="notice adult-player-notice" role="status"><b>18+ in-page servers</b> · Playback and episode matching are not verified for this title. Try another server if one fails; video and ads come from third parties.</div>` : ''}
+        <div class="source-tabs tabs-scroll" id="tabs" role="tablist" aria-label="${m.isAdult ? 'Adult episode servers' : 'Episode servers'}"></div>
         <div class="watch-bar">
           <div class="watch-title"><h1>${item.title}</h1><div class="muted">${epLabel}${epInfo?.name ? ` — ${epInfo.name}` : ''}</div></div>
           <div class="row">
@@ -120,7 +132,7 @@ export default async function watch(ctx) {
     }
     return now;
   };
-  const sourceQuery = () => ['aniweeb', 'animegg', 'anipub', 'senshi', 'kitsune', 'mkissa', ...Object.keys(EXTRA_PLAYERS)].includes(active.id) ? `?src=${active.id}` : '';
+  const sourceQuery = () => (m.isAdult && active.id === 'instant') || ['aniweeb', 'animegg', 'anipub', 'senshi', 'kitsune', 'mkissa', ...Object.keys(EXTRA_PLAYERS)].includes(active.id) ? `?src=${active.id}` : '';
   const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`); };
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
@@ -184,7 +196,7 @@ export default async function watch(ctx) {
         <div class="seg" aria-label="Audio language"><button type="button" data-instant-audio="sub" class="${audio === 'sub' ? 'on' : ''}" aria-pressed="${audio === 'sub'}">Sub</button><button type="button" data-instant-audio="dub" class="${audio === 'dub' ? 'on' : ''}" aria-pressed="${audio === 'dub'}">Dub</button></div>
         <button type="button" class="btn sm" data-instant-retry>${icon('refresh')} Retry player</button>
         <button type="button" class="btn sm" data-instant-protect aria-pressed="${protectedMode}">${icon('shield')} Popup protection: ${protectedMode ? 'on' : 'off'}</button>
-        <p class="muted instant-help">Popup protection limits new tabs and top-level redirects, but this provider may refuse to play with it on. It cannot remove ads inside the player. Try Aniweeb or disable protection if playback fails. <a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a></p>
+        <p class="muted instant-help">Popup protection limits new tabs and top-level redirects, but this provider may refuse to play with it on. It cannot remove ads inside the player. Try Aniweeb or disable protection if playback fails. ${m.isAdult ? '' : html`<a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a>`}</p>
       </div>`);
     };
     drawPlayer();
