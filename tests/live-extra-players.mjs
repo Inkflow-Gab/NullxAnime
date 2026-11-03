@@ -6,11 +6,13 @@ const players = [
   ['SupaPlay', 'https://supaplay.fun/stream/ani/154587/1/sub'],
   ['AniEmbed', 'https://aniembed.se/e/154587/1?lang=sub'],
   ['Movies Nexus', 'https://www.moviesnexus.fun/anime/154587/1/sub'],
+  ['MegaVid', 'https://megavid.buzz/ani/154587/1/sub'],
+  ['Shonen', 'https://shonen.to/embed/anilist/154587/1?language=sub&parentOrigin=https%3A%2F%2Finkflow-gab.github.io'],
 ];
 const note = (level, text) => console.log(`::${level}::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 let browser;
 try {
-  browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: 'shell', args: [...chromium.args, '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
+  browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: 'shell', args: [...chromium.args.filter((arg) => arg !== '--disable-web-security'), '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
   await Promise.all(players.map(async ([name, src], i) => {
     const page = await browser.newPage();
     try {

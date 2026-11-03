@@ -247,13 +247,13 @@ export default async function watch(ctx) {
   function extraView(tab) {
     let audio = getSettings().extraAudio === 'dub' ? 'dub' : 'sub';
     const drawPlayer = () => {
-      const src = extraEmbed(tab.id, id, ep, audio);
+      const src = extraEmbed(tab.id, id, ep, audio, location.origin);
       mountEmbed(src, `${item.title} — ${tab.label}`, true);
       render(panel, html`<div class="instant-panel glass">
         <div><b>${tab.label}</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
         <div class="seg" role="group" aria-label="Audio language">${['sub', 'dub'].map((a) => html`<button type="button" data-extra-audio="${a}" class="${audio === a ? 'on' : ''}" aria-pressed="${audio === a}">${a === 'sub' ? 'Sub' : 'Dub'}</button>`)}</div>
         <button type="button" class="btn sm" data-extra-retry>${icon('refresh')} Retry player</button>
-        <p class="muted instant-help">Popup protection is enabled; in-player ads may still appear. If this provider or audio track fails, try another source. Availability and playback depend on the provider.</p>
+        <p class="muted instant-help">Popup protection is enabled; in-player ads may still appear. ${tab.label.includes('experimental') ? 'This player is experimental and real playback has not been verified. ' : ''}If this provider or audio track fails, try another source. Availability and playback depend on the provider.</p>
       </div>`);
     };
     drawPlayer();

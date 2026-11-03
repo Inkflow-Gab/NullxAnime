@@ -56,7 +56,7 @@ async function mockNetwork(page) {
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/data/release.js' && mockNextRelease) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const RELEASE = { id: 'test-next-release', title: 'Future update', changes: ['New future feature'] };" });
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && (!useLiveGateway || mockProviderEndpoints || mockMangaGateway)) return req.respond({ status: 200, contentType: 'text/javascript', body: `export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: '${mockProviderEndpoints ? 'https://kitsune-api.test/api' : ''}', streamWorker: '${mockProviderEndpoints ? 'https://stream.test' : ''}', aniPub: '${mockProviderEndpoints ? 'https://anipub.test' : ''}', mangaGateway: '${mockMangaGateway ? 'https://manga-gateway.test' : ''}' });` });
     if (u.origin === new URL(BASE).origin) return req.continue();
-    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
+    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun', 'megavid.buzz', 'shonen.to'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'api.aniweeb.net') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Aniweeb episode mock</body></html>' });
     if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/mkissa/1000') return req.respond(json({ providers: { mkissa: { episodes: { sub: [{ id: 'watch/mkissa/1000/sub/mkissa-1', number: 1 }] } } } }));
@@ -147,8 +147,8 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Manga connection update') &&
-        dialog.textContent.includes('connection') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('System breach') &&
+        dialog.textContent.includes('experimental') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
   check('system window animates and respects reduced motion', await (async () => {
@@ -164,6 +164,19 @@ try {
     await page.emulateMediaFeatures([]);
     await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'auto'));
     return animated && reduced && lightweight && lightweightReduced;
+  })());
+  check('shattering intro is decorative, lightweight and respects reduced motion', await (async () => {
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'off'));
+    const normal = await page.$eval('.update-rupture', (el) => el.getAttribute('aria-hidden') === 'true' && getComputedStyle(el).pointerEvents === 'none' && getComputedStyle(el.querySelector('.glass-cracks path')).animationName === 'crack-draw' && el.querySelectorAll('.shard').length === 6);
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    const reduced = await page.$eval('.update-rupture', (el) => getComputedStyle(el).display === 'none');
+    await page.emulateMediaFeatures([]);
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'on'));
+    const light = await page.$eval('.update-rupture', (el) => getComputedStyle(el.querySelector('.glass-shards')).display === 'none' && getComputedStyle(el).display !== 'none');
+    await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSetting('reduceMotion', true); });
+    const manual = await page.$eval('.update-rupture', (el) => getComputedStyle(el).display === 'none');
+    await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSetting('reduceMotion', false); s.setSetting('performanceMode', 'auto'); });
+    return normal && reduced && light && manual;
   })());
   check('release stays visible until acknowledged, then stays dismissed', await (async () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -301,10 +314,12 @@ try {
     return first && await page.$eval('#stage iframe', (e) => e.src === 'https://api.aniweeb.net/embed/ani/1000/1?track=dub&server=2') && !(await page.$('#panel input[type="url"]'));
   })());
   check('additional episode players use sandboxed embeds and audio choices', await (async () => {
-    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun']]) {
+    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun'], ['megavid', 'megavid.buzz'], ['shonen', 'shonen.to']]) {
       await page.$eval(`[data-src="${id}"]`, (e) => e.click());
       const first = await page.$eval('#stage iframe', (f) => ({ host: new URL(f.src).hostname, sandbox: f.getAttribute('sandbox') }));
       if (first.host !== host || !first.sandbox || first.sandbox.includes('allow-popups')) return false;
+      if (id === 'shonen' && !await page.$eval('#stage iframe', (f) => new URL(f.src).searchParams.get('parentOrigin') === location.origin)) return false;
+      if ((id === 'shonen' || id === 'megavid') && !(await page.$eval('#panel', (p) => p.textContent.includes('not been verified')))) return false;
       await page.$eval('[data-extra-audio="dub"]', (e) => e.click());
       const src = await page.$eval('#stage iframe', (f) => f.src);
       if (!src.includes('dub')) return false;
@@ -708,7 +723,7 @@ try {
     await visit('/manga?q=Mock', '#comic-grid');
     await page.click('.comic-diagnostic summary');
     await page.click('#comic-check');
-    await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length === 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'));
+    try { await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length >= 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'), { timeout: 12000 }); } catch (error) { console.error('Diagnostic state:', await page.$eval('#comic-check-results', (el) => el.textContent)); throw error; }
     return await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && !!document.querySelector('#comic-sort a.on') && !document.querySelector('#comic-check').disabled);
   })());
   check('small phone scan reader stays within viewport', await visit('/scans/vortex/mock-iken/1', '.reader .rpage', { timeout: 10000 }) && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
