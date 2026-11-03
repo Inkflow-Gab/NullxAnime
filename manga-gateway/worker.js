@@ -6,6 +6,7 @@ const TARGETS = {
   vortex: 'https://api.vortexscans.org',
 };
 const SLUG = '[a-z0-9][a-z0-9-]{0,199}';
+/** @type {Array<[string, RegExp, Set<string>]>} */
 const routes = [
   ['asura', /^\/series$/, new Set(['limit', 'offset', 'sort', 'search'])],
   ['asura', new RegExp(`^/series/${SLUG}(?:/chapters(?:/\\d{1,6}(?:\\.\\d{1,4})?)?)?$`), new Set()],

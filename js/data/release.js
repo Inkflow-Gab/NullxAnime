@@ -1,11 +1,11 @@
 // Update this record for every release with the user-facing changes.
 // The Pages workflow stamps the deployed commit as the unique release ID.
 export const RELEASE = Object.freeze({
-  id: '2026-11-system-panel',
-  title: 'A new system window',
+  id: '2026-11-manga-relay',
+  title: 'Manga connection update',
   changes: [
-    'A new animated system window brings release notes to life.',
-    'Manga connection diagnostics remain available under Having trouble connecting?',
-    'A server-side catalogue relay is prepared but not yet deployed; sources may still be blocked.',
+    'Asura and Vortex can use a relay when direct catalogue requests fail.',
+    'The connection check shows both direct and relay results.',
+    'Availability and chapter images still depend on each provider and network.',
   ],
 });

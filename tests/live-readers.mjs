@@ -10,7 +10,7 @@ const sources = [
 const note = (level, text) => console.log(`::${level}::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 let browser;
 try {
-  browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: 'shell', args: [...chromium.args, '--no-sandbox'] });
+  browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: 'shell', args: [...chromium.args.filter((arg) => arg !== '--disable-web-security'), '--no-sandbox'] });
   const page = await browser.newPage();
   const probe = 'https://inkflow-gab.github.io/__nx_reader_probe__';
   await page.setRequestInterception(true);
