@@ -1,3 +1,4 @@
+import { attachReaderTools } from '../ui/readerTools.js';
 // Manga reader: vertical (webtoon), paged left-to-right, paged right-to-left.
 
 import { html, render, $, $$, on, clamp, esc } from '../util.js';
@@ -227,4 +228,8 @@ export default async function reader(ctx) {
   ctx.cleanup(() => cleanups.forEach((fn) => fn()));
   ctx.cleanup(() => io?.disconnect());
   mount();
+  attachReaderTools(ctx, rd, pages.length, (index) => {
+    if (s.readerMode === 'vertical') rv.querySelector(`.rwrap[data-i="${index}"]`)?.scrollIntoView({ block: 'start' });
+    else show(index);
+  });
 }

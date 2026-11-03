@@ -4,7 +4,7 @@ import { html, render, $, $$, on, cleanAniHtml, fmtFuzzyDate, fmtCountdown, fmtD
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
 import { card, rail, fromAnime, titleOf, fmtFormat, fmtStatus, toast, skelRail, errorBox, openLibraryMenu, setStatus, PLACEHOLDER } from '../ui/components.js';
-import { getEntry, saveEntry, getMarks, toggleMark, setMarks, lastHistory, subscribe, statusLabel, STATUSES } from '../store.js';
+import { getEntry, saveEntry, getMarks, toggleMark, setMarks, lastHistory, subscribe, getSettings, statusLabel, STATUSES } from '../store.js';
 import { episodeCount, episodeLinkMap, infoLinks } from '../sources.js';
 import { mountSeasonPicker } from '../ui/seasons.js';
 
@@ -14,7 +14,7 @@ export default async function anime(ctx) {
   let m;
   try { m = await mediaDetail(id); } catch (e) { ctx.render(html`<div class="container page">${errorBox(e)}</div>`); return; }
   if (!ctx.alive()) return;
-  if (m.isAdult) { ctx.render(html`<div class="container page"><div class="empty"><h3>Not available</h3><p>This title is not available on NullxAnime.</p></div></div>`); return; }
+  if (m.isAdult && getSettings().adultManga !== true) { ctx.render(html`<div class="container page"><div class="empty"><h3>Not available</h3><p>This title is not available on NullxAnime.</p></div></div>`); return; }
 
   const item = fromAnime(m);
   ctx.setTitle(item.title);
@@ -129,7 +129,7 @@ export default async function anime(ctx) {
       const all = getMarks('anime', id);
       for (let e = 1; e <= count; e++) all.add(e);
       setMarks('anime', id, all);
-      saveEntry('anime', id, { progress: count, status: 'completed' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
+      saveEntry('anime', id, { progress: count, status: 'completed' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format, contentRating: item.contentRating });
       toast('Marked everything as watched');
     });
     on(root, 'click', '[data-mark]', (e, t) => {
@@ -138,7 +138,7 @@ export default async function anime(ctx) {
       const now = toggleMark('anime', id, ep);
       const e0 = getEntry('anime', id);
       if (now && (!e0 || ep > (e0.progress || 0))) {
-        saveEntry('anime', id, { progress: ep, status: e0?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
+        saveEntry('anime', id, { progress: ep, status: e0?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format, contentRating: item.contentRating });
       }
     }, { signal });
     // live countdown
@@ -149,7 +149,7 @@ export default async function anime(ctx) {
     // tracker panel
     on(root, 'change', '[data-track]', (e, t) => {
       const kind = t.dataset.track;
-      const base = { title: item.title, cover: item.cover, total: m.episodes, format: m.format };
+      const base = { title: item.title, cover: item.cover, total: m.episodes, format: m.format, contentRating: item.contentRating };
       if (kind === 'status') { setStatus(item, t.value); return; }
       if (kind === 'score') saveEntry('anime', id, { score: Number(t.value) }, base);
       if (kind === 'progress') saveEntry('anime', id, { progress: Math.max(0, Math.min(Number(t.value) || 0, m.episodes || 9999)) }, base);
@@ -157,7 +157,7 @@ export default async function anime(ctx) {
     on(root, 'click', '[data-step]', (e, t) => {
       const e0 = getEntry('anime', id);
       const p = Math.max(0, Math.min((e0?.progress || 0) + Number(t.dataset.step), m.episodes || 9999));
-      saveEntry('anime', id, { progress: p, status: e0?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
+      saveEntry('anime', id, { progress: p, status: e0?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format, contentRating: item.contentRating });
     }, { signal });
   }
 

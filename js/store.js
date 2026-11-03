@@ -21,7 +21,10 @@ export const DEFAULT_SETTINGS = {
   accent: 'violet',
   titleLang: 'romaji',    // romaji | english | native
   mangaLang: 'en',
-  adultManga: false, // opt-in and local self-attestation, not age verification
+  adultManga: false, // local opt-in, not age verification
+  adultConfirmation: false,
+  browseLayout: 'grid',
+  readerWidth: 100,
   readerMode: 'vertical', // vertical | ltr | rtl
   readerFit: 'width',     // width | height | original
   readerDataSaver: false,
@@ -39,6 +42,8 @@ export const DEFAULT_SETTINGS = {
   tvMode: null,           // null = auto; true / false = manual override
 };
 let settings = { ...DEFAULT_SETTINGS, ...read('settings', {}) };
+// Previous versions used a different confirmation: require the new declaration and challenge.
+if (settings.adultConfirmation !== true) settings.adultManga = false;
 export const getSettings = () => settings;
 export function setSetting(key, value) {
   settings = { ...settings, [key]: value };
@@ -175,7 +180,7 @@ export function exportAll() {
 }
 export function importAll(data, { merge = true } = {}) {
   if (!data || data.app !== 'NullxAnime') throw new Error('This file is not a NullxAnime backup.');
-  if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings, adultManga: false }; write('settings', settings); applySettings(); }
+  if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings, adultManga: false, adultConfirmation: false }; write('settings', settings); applySettings(); }
   if (data.library) { library = merge ? { ...library, ...data.library } : data.library; write('library', library); }
   if (data.history) { history = merge ? [...data.history, ...history].slice(0, 60) : data.history; write('history', history); }
   if (data.marks) {

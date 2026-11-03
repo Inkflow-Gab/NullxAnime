@@ -90,11 +90,11 @@ export function anilist(body) {
     const f = variables.from;
     return { data: { Page: { pageInfo: { hasNextPage: false }, airingSchedules: many(9, 3).map((m, k) => ({ airingAt: f + 3600 * (3 + k * 2), episode: 5 + k, timeUntilAiring: 3600 * (3 + k * 2) - 100, media: { ...m, countryOfOrigin: 'JP' } })) } } };
   }
-  if (query.includes('Media(id')) return { data: { Media: detail(variables.id) } };
+  if (query.includes('Media(id')) return { data: { Media: { ...detail(variables.id), isAdult: variables.id === 1099 } } };
   if (query.includes('id_in')) return { data: { Page: { media: variables.ids.map((id) => media(id - 1000)) } } };
   if (query.includes('$search')) {
     const q = (variables.search || '').toLowerCase();
-    let items = many(20).filter((m) => !q || `${m.title.romaji} ${m.title.english}`.toLowerCase().includes(q));
+    let items = (query.includes('isAdult: true') ? [media(99, { isAdult: true })] : many(20)).filter((m) => !q || `${m.title.romaji} ${m.title.english}`.toLowerCase().includes(q));
     if (variables.genre) items = items.filter((m) => m.genres.includes(variables.genre));
     return { data: { Page: { pageInfo: { hasNextPage: variables.page < 2 && items.length > 10, currentPage: variables.page, total: items.length }, media: items } } };
   }

@@ -2,7 +2,7 @@
 
 import { html, render, $, $$, on } from './util.js';
 import { icon } from './ui/icons.js';
-import { applySettings, getSettings, setSetting } from './store.js';
+import { applySettings, getSettings, setSetting, subscribe } from './store.js';
 import { bindGlobalUi, toast } from './ui/components.js';
 import { openPalette, setPaletteType } from './ui/palette.js';
 import { startRouter, onRoute, go, reload } from './router.js';
@@ -26,15 +26,16 @@ const NAV = [
 ];
 
 function drawShell() {
+  const navItems = getSettings().adultManga === true ? [...NAV.slice(0, 2), ['adult', 'Hentai', '#/adult', 'film'], ...NAV.slice(2)] : NAV;
   render($('#topbar'), html`
     <a class="brand" href="#/" aria-label="NullxAnime home"><img src="assets/icon-192.png" alt="" width="32" height="32"><span>Nullx<b>Anime</b></span></a>
-    <nav class="nav" aria-label="Main">${NAV.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${label}</a>`)}</nav>
+    <nav class="nav" aria-label="Main">${navItems.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${label}</a>`)}</nav>
     <div class="topbar-spacer"></div>
     <div class="top-actions">
       <button class="search-trigger" data-action="search" aria-label="Search">${icon('search')}<span>Search anime &amp; manga</span><kbd>/</kbd></button>
       <a class="icon-btn" href="#/settings" aria-label="Settings" title="Settings">${icon('settings')}</a>
     </div>`);
-  render($('#tabbar'), NAV.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${icon(ic)}<span>${label === 'My List' ? 'List' : label}</span></a>`));
+  render($('#tabbar'), navItems.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${icon(ic)}<span>${label === 'My List' ? 'List' : label}</span></a>`));
   render($('#footer'), html`<div class="footer-inner">
     <div><a class="brand" href="#/" style="margin-bottom:10px"><img src="assets/icon-192.png" alt="" width="28" height="28"><span>Nullx<b>Anime</b></span></a>
       <p>Your anime &amp; manga universe. No account needed; your list lives in your browser. Third-party players may contain ads.</p></div>
@@ -45,6 +46,12 @@ function drawShell() {
   </div>`);
 }
 drawShell();
+subscribe((kind, detail) => {
+  if (kind === 'import' || (kind === 'settings' && detail.key === 'adultManga')) {
+    const active = $('[data-nav].active')?.dataset.nav;
+    drawShell(); $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === active)); updateTopbar();
+  }
+});
 showUpdateWindow();
 
 /* ----- active nav state + transparent top bar over heroes ----- */

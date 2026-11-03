@@ -89,3 +89,11 @@ Update `js/data/release.js` with a short title and user-facing changes for each 
 
 ### App update recovery
 The service worker keeps each release's app files together instead of refreshing modules independently. During the one-time migration from the older cache, open app tabs reload to repair mixed files; browser library, settings and reading history are not deleted. Later updates wait for you to reload, and other open tabs keep using their original version until they reload. If an app module cannot load, the recovery button performs a full page reload.
+
+### Optional 18+ content
+
+Adult content is off by default. In Settings, an adult may opt in by declaring they are at least 18 and solving the displayed arithmetic challenge. This is a local browser preference, **not age verification**, and it is not a substitute for parental controls or a legally required age check. Previously enabled settings require the new confirmation; imports never enable it. Turning it off hides the Hentai navigation and adult-rated library/history entries and blocks the adult routes. Browser storage and backups are not encrypted or deleted by turning the setting off.
+
+The opt-in Hentai page searches adult anime **metadata** from AniList; the app does not host video. Existing player tabs are experimental for adult titles and their playback or correct episode mapping has not been verified. No HentaiHaven, Hanime, or Hentaigasm integration is claimed. Adult manga remains available via MangaDex and Omega Scans where the providers permit access.
+
+Anime search and the combined manga catalogue offer persistent grid/list views. The reader tools panel provides fit-width sizing, jump-to-page and fullscreen on MangaDex, Asura and scan readers. MangaDex also supports paged LTR/RTL and data saver; availability depends on the source.

@@ -41,7 +41,13 @@ export default async function settings(ctx) {
           <div class="seg">${[['vertical', 'Vertical'], ['ltr', 'LTR'], ['rtl', 'RTL']].map(([v, l]) => html`<button data-set="readerMode" data-v="${v}" class="${s.readerMode === v ? 'on' : ''}">${l}</button>`)}</div></div>
         <div class="set-row"><div><b>Image fit</b></div>
           <div class="seg">${[['width', 'Width'], ['height', 'Height'], ['original', 'Original']].map(([v, l]) => html`<button data-set="readerFit" data-v="${v}" class="${s.readerFit === v ? 'on' : ''}">${l}</button>`)}</div></div>
-        <div class="set-row"><div><b>18+ manga</b><small>Off by default. Includes MangaDex adult-rated titles and Omega Scans after confirming you are 18 or older. This is not age verification.</small></div>${toggle('adultManga', s.adultManga)}</div>
+        <div class="set-row"><div><b>18+ anime &amp; manga</b><small>Off by default. Enables the Hentai catalogue and adult manga sources. Self-declaration and a math question are not age verification.</small></div>${toggle('adultManga', s.adultManga)}</div>
+        <form id="adult-gate" class="adult-gate" hidden>
+          <h3>Enable 18+ content</h3><p>This is a local self-declaration, not age verification. Content and third-party players may be explicit.</p>
+          <label class="adult-declaration"><input id="adult-declare" type="checkbox"> I confirm I am at least 18 years old and want to view adult content.</label>
+          <label for="adult-answer" id="adult-question"></label><input class="input" id="adult-answer" type="number" inputmode="numeric" required aria-describedby="adult-error">
+          <p id="adult-error" role="status" aria-live="polite"></p><div class="row"><button class="btn primary" type="submit">Enable 18+</button><button class="btn" type="button" id="adult-cancel">Cancel</button></div>
+        </form>
         <div class="set-row"><div><b>Data saver</b><small>Use compressed page images.</small></div>${toggle('readerDataSaver', s.readerDataSaver)}</div>
       </section>
 
@@ -66,13 +72,34 @@ export default async function settings(ctx) {
       </section>
     </div>`);
   };
-  const toggle = (key, on_) => html`<label class="switch"><input type="checkbox" data-tg="${key}" ${on_ ? 'checked' : ''}><i></i></label>`;
+  const toggle = (key, on_) => html`<label class="switch"><input type="checkbox" aria-label="${key === 'adultManga' ? '18+ anime and manga' : key}" data-tg="${key}" ${on_ ? 'checked' : ''}><i></i></label>`;
   draw();
   on(ctx.el, 'click', '[data-tv]', (e, t) => { setSetting('tvMode', t.dataset.tv === 'auto' ? null : t.dataset.tv === 'on'); draw(); });
   on(ctx.el, 'click', '[data-set]', (e, t) => { setSetting(t.dataset.set, t.dataset.v); draw(); });
+  let answer;
   on(ctx.el, 'change', '[data-tg]', (e, t) => {
-    if (t.dataset.tg === 'adultManga' && t.checked && !confirm('I confirm that I am at least 18 years old and want to see adult-rated manga on this device.')) { t.checked = false; return; }
+    if (t.dataset.tg === 'adultManga') {
+      if (t.checked) {
+        t.checked = false;
+        const a = 23 + Math.floor(Math.random() * 27), b = 17 + Math.floor(Math.random() * 25), c = 31 + Math.floor(Math.random() * 50);
+        answer = a * b - c;
+        $('#adult-question', ctx.el).textContent = `Solve: ${a} × ${b} − ${c} = ?`;
+        $('#adult-gate', ctx.el).hidden = false;
+        $('#adult-declare', ctx.el).focus();
+        return;
+      }
+      setSetting('adultConfirmation', false);
+    }
     setSetting(t.dataset.tg, t.checked);
+  });
+  on(ctx.el, 'click', '#adult-cancel', () => { $('#adult-gate', ctx.el).hidden = true; $('[data-tg="adultManga"]', ctx.el).focus(); });
+  on(ctx.el, 'submit', '#adult-gate', (e) => {
+    e.preventDefault();
+    if (!$('#adult-declare', ctx.el).checked || Number($('#adult-answer', ctx.el).value) !== answer || $('#adult-answer', ctx.el).value.trim() === '') {
+      $('#adult-error', ctx.el).textContent = 'Please confirm your age and enter the correct answer.'; return;
+    }
+    setSetting('adultConfirmation', true); setSetting('adultManga', true); draw();
+    $('[data-tg="adultManga"]', ctx.el).focus();
   });
   on(ctx.el, 'change', '[data-sel]', (e, t) => setSetting(t.dataset.sel, t.value));
   const q = (sel, fn) => ctx.el.addEventListener('click', (e) => { if (e.target.closest(sel)) fn(e); });

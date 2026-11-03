@@ -2,6 +2,7 @@
 // Docs: https://docs.anilist.co/
 
 import { cached, MIN, HOUR } from '../cache.js';
+import { getSettings } from '../store.js';
 import { currentSeason, nextSeason, sleep } from '../util.js';
 
 const ENDPOINT = 'https://graphql.anilist.co';
@@ -77,15 +78,16 @@ export function homeFeed() {
 }
 
 /* ---------- Search / browse -------------------------------------------------------- */
-export function searchMedia({ type = 'ANIME', q = '', page = 1, perPage = 30, genre, tag, format, status, season, year, sort, country } = {}) {
-  const key = `al:s:${JSON.stringify([type, q, page, perPage, genre, tag, format, status, season, year, sort, country])}`;
+export function searchMedia({ type = 'ANIME', q = '', page = 1, perPage = 30, genre, tag, format, status, season, year, sort, country, adultOnly = false } = {}) {
+  if (adultOnly && getSettings().adultManga !== true) throw new Error('18+ content is off in Settings.');
+  const key = `al:s:${JSON.stringify([type, q, page, perPage, genre, tag, format, status, season, year, sort, country, adultOnly])}`;
   return cached(key, 10 * MIN, async () => {
     const query = `query ($page: Int, $perPage: Int, $type: MediaType, $search: String, $genre: String, $tag: String, $format: MediaFormat,
       $status: MediaStatus, $season: MediaSeason, $year: Int, $sort: [MediaSort], $country: CountryCode) {
       Page(page: $page, perPage: $perPage) {
         pageInfo { hasNextPage currentPage total }
         media(type: $type, search: $search, genre: $genre, tag: $tag, format: $format, status: $status, season: $season, seasonYear: $year,
-              sort: $sort, countryOfOrigin: $country, isAdult: false) { ${CARD} }
+              sort: $sort, countryOfOrigin: $country, isAdult: ${adultOnly ? 'true' : 'false'}) { ${CARD} }
       }
     }`;
     const vars = {
@@ -94,7 +96,7 @@ export function searchMedia({ type = 'ANIME', q = '', page = 1, perPage = 30, ge
       sort: [sort || (q ? 'SEARCH_MATCH' : 'POPULARITY_DESC')],
     };
     const d = await gql(query, vars);
-    return { items: d.Page.media, hasNext: d.Page.pageInfo.hasNextPage, total: d.Page.pageInfo.total };
+    return { items: d.Page.media.filter((m) => adultOnly ? m.isAdult === true : !m.isAdult), hasNext: d.Page.pageInfo.hasNextPage, total: d.Page.pageInfo.total };
   });
 }
 
