@@ -6,7 +6,7 @@ import chromium from '@sparticuz/chromium';
 const note = (level, message) => console.log(`::${level}::${message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 let browser;
 try {
-  const query = `{ Page(page: 1, perPage: 5) { media(type: ANIME, isAdult: true, tag: "Adult Cast", status: FINISHED, sort: POPULARITY_DESC) { id episodes title { romaji english } } } }`;
+  const query = `{ Page(page: 1, perPage: 5) { media(type: ANIME, isAdult: true, tag: "Primarily Adult Cast", status: FINISHED, sort: POPULARITY_DESC) { id episodes title { romaji english } } } }`;
   const response = await fetch('https://graphql.anilist.co', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query }), signal: AbortSignal.timeout(15000) });
   const json = await response.json();
   const sample = json.data?.Page?.media?.find((m) => m.id && m.episodes > 0 && (m.title?.romaji || m.title?.english));
