@@ -13,6 +13,9 @@ try {
   await page.setRequestInterception(true);
   page.on('request', (req) => req.url() === PROBE ? req.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Gateway probe</title>' }) : req.continue());
   await page.goto(PROBE, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  note('notice', `Probe document origin: ${await page.evaluate(() => location.origin)}`);
+  page.on('request', (req) => { if (req.url().startsWith(BASE)) note('notice', `Gateway request origin header: ${req.headers().origin || '(none)'}`); });
+  page.on('response', (res) => { if (res.url().startsWith(BASE)) note('notice', `Gateway response status=${res.status()} allow-origin=${res.headers()['access-control-allow-origin'] || '(none)'}`); });
   const get = (path) => page.evaluate(async (url) => {
     const res = await fetch(url, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(18000) });
     if (!res.ok) { const text = (await res.text()).slice(0, 200); throw new Error(`HTTP ${res.status}: ${text}`); }
