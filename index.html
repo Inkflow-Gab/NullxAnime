@@ -40,6 +40,18 @@
   <div id="overlay-root"></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <noscript><p style="padding:2rem;color:#fff">NullxAnime needs JavaScript to run.</p></noscript>
-  <script type="module" src="js/main.js"></script>
+  <script>
+    // This fallback is independent of the module graph, so a broken import can
+    // still show a recovery button and ask an existing worker to check updates.
+    function nxStartFailed() {
+      var app = document.getElementById('app');
+      app.innerHTML = '<div class="container page"><div class="empty"><h3>Reload needed</h3><p>NullxAnime could not start. Reload to try the current version.</p><button class="btn primary" type="button" id="bootstrap-retry">Reload app</button></div></div>';
+      document.getElementById('bootstrap-retry').addEventListener('click', function () { location.reload(); });
+      if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0 && !/[?&]nosw/.test(location.search)) {
+        navigator.serviceWorker.register('sw.js').then(function (reg) { return reg.update(); }).catch(function () {});
+      }
+    }
+  </script>
+  <script type="module">import('./js/main.js').catch(nxStartFailed);</script>
 </body>
 </html>

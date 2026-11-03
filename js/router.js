@@ -87,13 +87,15 @@ async function resolve(force = false) {
     setTitle,
   };
   notify(match.nav, path);
+  let moduleLoaded = false;
   try {
     const mod = await match.load();
+    moduleLoaded = true;
     if (!ctx.alive()) return;
     await mod.default(ctx);
   } catch (err) {
     console.error(err);
-    if (ctx.alive()) ctx.render(errorBox(err));
+    if (ctx.alive()) ctx.render(moduleLoaded ? errorBox(err) : errorBox(new Error('The app could not load this page. Reload to try the current version.'), { title: 'Reload needed', action: 'reload-app', button: 'Reload app' }));
   }
   if (!ctx.alive()) return;
   // restore scroll for back/forward, otherwise go to top
