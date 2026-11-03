@@ -11,8 +11,8 @@ A sleek, fast **anime + manga** hub. No account required and no ads added by Nul
 | Area | What you get |
 | --- | --- |
 | **Anime** | Hero carousel, a **Top 10 ranking** right under it (trending / most popular / top rated / this season), **Recently updated** (episodes that just aired, linking straight to the episode), **New releases**, **Airing soon** and **Upcoming anime with premiere dates**, plus airing / seasonal / top-rated rails, full search + filters (genre, format, status, season, year, sort), detail pages with episodes, characters, relations, recommendations, tags, staff. Data: [AniList](https://anilist.co). |
-| **Watch** | Official free YouTube streams + trailers play inline; per-episode links to the official service (Crunchyroll, Netflix, Muse Asia…); public-domain / CC video from the [Internet Archive](https://archive.org); An optional local-file player (MP4, WebM, SRT/VTT subtitles). Custom player with keyboard shortcuts, speed, quality, PiP, resume position. Additional adapters are displayed only when the site operator has configured a backend. |
-| **Manga** | Home rails (popular, latest, top rated, manhwa, manhua), search + tag/origin/demographic filters, chapter lists in 18 languages, and a full reader (vertical webtoon, paged LTR/RTL, fit modes, data saver, keyboard/tap zones, auto prefetch). Data: [MangaDex](https://mangadex.org). Only *safe/suggestive* ratings. |
+| **Watch** | No-setup Instant play, Aniweeb, SupaPlay, AniEmbed and Movies Nexus episode-player embeds, with audio and server choices. The public-domain / CC [Internet Archive](https://archive.org) library is also available. Providers control playback, ads and availability. |
+| **Manga** | MangaDex search and reader plus separate Asura, Vortex, Hivetoons and Omega Scans catalogues and vertical readers. MangaDex manga, manhwa and manhua include safe/suggestive ratings by default; adult-rated titles require local 18+ opt-in. Omega is an 18+ source and is hidden until opt-in; source catalogues are separate from MangaDex. |
 | **Tracker** | One list for anime + manga: status, progress, score, history, stats, JSON backup/restore, MyAnimeList/AniList XML export. Lives in `localStorage`. |
 | **Schedule** | Per-day airing calendar in your timezone, "only my list" filter. |
 | **Discover** | Curated directory of trackers, schedules, official sources and tools (derived from [awesome-anime-sources](https://github.com/anshumanv/awesome-anime-sources), legal sources only). |
@@ -20,7 +20,7 @@ A sleek, fast **anime + manga** hub. No account required and no ads added by Nul
 
 ## Community streaming
 
-The watch page starts with **Instant play**, a direct episode embed using the same fallback endpoint as Kitsune. No server URL is required, but the provider may be unavailable, block embedding or lack a particular episode. The site also includes an AnimeGG adapter based on [Kitsune](https://github.com/Dovakiin0/Kitsune), but it is hidden until the site maintainer deploys and configures the worker. Viewers are not asked for a server URL.
+The watch page starts with **Instant play**, a direct episode embed using the same fallback endpoint as Kitsune. **Aniweeb** offers a separate episode-player embed with two numbered servers; SupaPlay, AniEmbed and Movies Nexus provide additional sandboxed episode players. No server URL is required, but the provider may be unavailable, block embedding or lack a particular episode. The site also includes an AnimeGG adapter based on [Kitsune](https://github.com/Dovakiin0/Kitsune), but it is hidden until the site maintainer deploys and configures the worker. Viewers are not asked for a server URL.
 
 The [AniPub](https://github.com/AnimePub/AniPub) adapter extracts a video or iframe source rather than embedding its full site. Its tab is hidden until the maintainer configures a working deployment and database; CORS and host restrictions can prevent playback.
 
@@ -47,8 +47,8 @@ css/                  base (tokens, shell) · components · pages
 js/main.js            bootstrap, shortcuts, PWA
 js/router.js          hash router (lazy page modules)
 js/store.js           settings, library, history, backups (localStorage)
-js/api/               anilist · mangadex · archive clients
-js/sources.js         official watch sources (YouTube, official links, search links)
+js/api/               AniList · MangaDex · scan-source · archive clients
+js/sources.js         episode metadata and external information-link helpers
 js/player.js          custom video player (MP4/WebM/HLS)
 js/pages/             one module per route
 js/ui/                icons, cards/rails/toasts/popovers, search palette
@@ -61,10 +61,20 @@ tests/                static server, API mocks, e2e
 
 ### Device and player notes
 
-The layout adapts to the viewport and touch input. Recognizable TV user agents enable remote navigation automatically; Settings can override TV mode. Detection is local and best-effort, not a guarantee for every device. The watch page includes episode filtering, retry, and share-link controls.
+The layout adapts to the viewport and touch input. Recognizable TV user agents enable remote navigation automatically; Settings can override TV mode. Detection is local and best-effort, not a guarantee for every device. The watch page includes episode filtering, retry, and share-link controls. The Recent episodes page paginates AniList airing events from the last 30 days; an aired episode may not yet be available at a provider.
 
 The optional Senshi tab retrieves available Senshi/StreamNin/FileMoon mirrors from the updated separately deployed worker using the title's MyAnimeList ID. Availability, embedding, audio, ads and permissions depend on each external provider; no provider backend is hosted by GitHub Pages. See [provider notes](docs/PROVIDERS.md) for what is and is not implemented.
 
-**More servers** can discover Kitsune-compatible providers and mirrors when the site operator configures an API. The **MKissa** tab is currently marked unavailable because no backend is deployed; MKissa manga is not integrated (the reader uses MangaDex). The app does not make all upstream servers ready by itself. Third-party streams may require unavailable headers or be blocked. See [provider notes](docs/PROVIDERS.md).
+**More servers** can discover Kitsune-compatible providers and mirrors when the site operator configures an API. The **MKissa** tab is hidden because no backend is deployed; MKissa manga is not integrated. The app does not make all upstream servers ready by itself. Third-party streams may require unavailable headers or be blocked. See [provider notes](docs/PROVIDERS.md).
 
 **Performance:** Lightweight effects automatically reduce expensive blur on phones, TVs, data-saving connections and devices reporting low memory. Override it under Settings. This reduces rendering work but cannot guarantee a particular frame rate.
+
+### Reading sources and mature content
+
+Asura's public JSON API supplies its own catalogue and chapter images; chapter listings omit paid or early-access chapters. Asura access and image loading can vary by browser, region, and provider changes. The Asura reader currently uses vertical scrolling and does not sync with the MangaDex tracker. The source was informed by [Yūzōnō's Android extensions](https://github.com/yuzono/anime-extensions) and [Kagi's Asura integration](https://github.com/Jocseh07/kagi), but APK extensions cannot run inside a browser.
+
+Omega Scans, Vortex Scans and Hivetoons use their public JSON APIs and direct image URLs. Only free/unlocked chapters are listed; the readers do not execute source-site ads or scripts. These integrations are mock-tested and their public JSON responses were observed live. Non-blocking CI probes check cross-origin access and a sample image from a Pages origin; availability can vary. Source restrictions, checks, image hotlink rules and 502 errors can prevent use. They currently do not sync to the MangaDex tracker. MangaFire, Toonily and MKissa manga are **not integrated**.
+
+The optional adult setting enables MangaDex adult ratings and Omega's catalogue only after the viewer self-attests they are 18 or older; it is off by default and is not age verification. Turn it off again in Settings. The source controls content and availability.
+
+Aniweeb and the new alternate players are sandboxed against popup and top-level navigation; Instant play offers an optional popup-protection toggle because its provider has refused sandboxed embeds. This may stop new tabs or redirects but **does not remove in-player ads**, and enabling it may break playback. NullxAnime cannot block all ads or browser checks inside a cross-origin player.

@@ -199,3 +199,20 @@ export function updatesFeed() {
     };
   });
 }
+
+/** A stable, paginated window of recently aired episodes (not provider availability). */
+export function recentEpisodes(from, to, page = 1) {
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from >= to || !Number.isInteger(page) || page < 1 || page > 500) throw new Error('Invalid releases page.');
+  return cached(`al:releases:${from}:${to}:${page}`, 5 * MIN, async () => {
+    const q = `query RecentEpisodes($from: Int, $to: Int, $page: Int) {
+      Page(page: $page, perPage: 50) {
+        pageInfo { hasNextPage }
+        airingSchedules(airingAt_greater: $from, airingAt_lesser: $to, sort: TIME_DESC) {
+          airingAt episode media { ${MINI} }
+        }
+      }
+    }`;
+    const d = await gql(q, { from, to, page });
+    return { items: (d.Page?.airingSchedules || []).filter((x) => x.media && !x.media.isAdult && ['TV', 'TV_SHORT', 'ONA', 'OVA', 'MOVIE', 'SPECIAL'].includes(x.media.format)), hasNext: d.Page?.pageInfo?.hasNextPage === true };
+  });
+}

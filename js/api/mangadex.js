@@ -1,13 +1,16 @@
 // MangaDex public API client — manga search, chapters and the page reader.
 // Docs: https://api.mangadex.org/docs/
-// Only "safe" and "suggestive" content ratings are ever requested.
+// Adult ratings are requested only after the viewer opts in locally.
 
 import { cached, MIN, HOUR } from '../cache.js';
 import { qs, sleep } from '../util.js';
+import { getSettings } from '../store.js';
 
 const API = 'https://api.mangadex.org';
 const COVERS = 'https://uploads.mangadex.org/covers';
-const RATINGS = ['safe', 'suggestive'];
+const SAFE_RATINGS = ['safe', 'suggestive'];
+const ADULT_RATINGS = ['erotica', 'pornographic'];
+export const mangaRatings = (adultOnly = false) => getSettings().adultManga === true ? (adultOnly ? ADULT_RATINGS.slice() : [...SAFE_RATINGS, ...ADULT_RATINGS]) : SAFE_RATINGS.slice();
 
 let lastAt = 0;
 async function call(path, params = {}, attempt = 0) {
@@ -69,13 +72,13 @@ export function normChapter(c) {
 const LIST_BASE = (lang) => ({
   limit: 24,
   'includes[]': ['cover_art', 'author', 'artist'],
-  'contentRating[]': RATINGS,
+  'contentRating[]': mangaRatings(),
   'availableTranslatedLanguage[]': lang ? [lang] : undefined,
   hasAvailableChapters: 'true',
 });
 
-export function listManga({ q, order = { followedCount: 'desc' }, offset = 0, limit = 24, lang = 'en', tags, excludeTags, origin, status, demographic, year } = {}) {
-  const params = { ...LIST_BASE(lang), limit, offset };
+export function listManga({ q, order = { followedCount: 'desc' }, offset = 0, limit = 24, lang = 'en', tags, excludeTags, origin, status, demographic, year, adultOnly = false } = {}) {
+  const params = { ...LIST_BASE(lang), limit, offset, 'contentRating[]': mangaRatings(adultOnly) };
   if (q) params.title = q;
   for (const [k, v] of Object.entries(order)) params[`order[${k}]`] = v;
   if (tags?.length) { params['includedTags[]'] = tags; params.includedTagsMode = 'AND'; }
@@ -87,7 +90,7 @@ export function listManga({ q, order = { followedCount: 'desc' }, offset = 0, li
   const key = `md:list:${JSON.stringify(params)}`;
   return cached(key, 10 * MIN, async () => {
     const j = await call('/manga', params);
-    return { items: j.data.map(normManga), total: j.total, offset: j.offset, hasNext: j.offset + j.data.length < j.total };
+    return { items: j.data.map(normManga).filter((m) => params['contentRating[]'].includes(m.contentRating)), total: j.total, offset: j.offset, hasNext: j.offset + j.data.length < j.total };
   });
 }
 
@@ -118,13 +121,14 @@ export function mangaDetail(id) {
 
 /** All chapters for a language, oldest → newest, plus alternates for the same chapter number. */
 export function chapterFeed(id, lang = 'en') {
-  return cached(`md:feed:${id}:${lang}`, 10 * MIN, async () => {
+  const ratings = mangaRatings();
+  return cached(`md:feed:${id}:${lang}:${ratings.join(',')}`, 10 * MIN, async () => {
     const all = [];
     for (let offset = 0; offset < 2000; offset += 500) {
       const j = await call(`/manga/${id}/feed`, {
         limit: 500, offset, 'translatedLanguage[]': [lang],
         'order[volume]': 'asc', 'order[chapter]': 'asc',
-        'contentRating[]': ['safe', 'suggestive'],
+        'contentRating[]': ratings,
         'includes[]': ['scanlation_group'],
         includeExternalUrl: 0,
         includeFuturePublishAt: 0,
@@ -186,7 +190,7 @@ export function tagList() {
 }
 
 export async function randomManga() {
-  const j = await call('/manga/random', { 'includes[]': ['cover_art', 'author', 'artist'], 'contentRating[]': RATINGS });
+  const j = await call('/manga/random', { 'includes[]': ['cover_art', 'author', 'artist'], 'contentRating[]': mangaRatings() });
   return normManga(j.data);
 }
 

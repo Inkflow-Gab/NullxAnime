@@ -250,3 +250,14 @@ html[data-performance="on"] .topbar,
 html[data-performance="on"] .tabbar { backdrop-filter: none; -webkit-backdrop-filter: none; background-color: rgba(14, 14, 22, .96); }
 html[data-performance="on"] .mhero-bg,
 html[data-performance="on"] .detail-banner img.blur-cover { filter: brightness(.38); }
+
+/* A short scythe flourish, rather than a constant animation on battery-powered devices. */
+@keyframes brand-flourish {
+  0%, 100% { transform: rotate(0) scale(1); }
+  30% { transform: rotate(-9deg) scale(1.05); }
+  65% { transform: rotate(5deg) scale(1.02); }
+}
+html[data-performance="off"] .topbar .brand img { animation: brand-flourish 1.2s var(--ease) .3s both; }
+html[data-performance="off"] .brand:hover img, html[data-performance="off"] .brand:focus-visible img { animation: brand-flourish .7s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { html .brand img { animation: none !important; } }
+html.reduce-motion .brand img { animation: none !important; }

@@ -1,15 +1,15 @@
-// Watch page — third-party episode player, official sources, personal media and community deployments.
+// Watch page — episode players and configured third-party providers.
 
 import { html, render, $, $$, on, esc, hostOf, safeUrl, clamp, debounce, titleCase, copyText } from '../util.js';
 import { PROVIDER_ENDPOINTS } from '../config.js';
 import { icon } from '../ui/icons.js';
 import { mediaDetail } from '../api/anilist.js';
-import { INSTANT_ORIGIN, instantEmbed, baseUrl, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
+import { INSTANT_ORIGIN, instantEmbed, aniweebEmbed, EXTRA_PLAYERS, extraEmbed, baseUrl, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer, anipubSource } from '../api/community.js';
 import { kitsuneEpisodes, kitsuneChoices, kitsuneWatch, kitsuneStreams, kitsuneProxy } from '../api/kitsune.js';
 import { searchOpenVideo, itemFiles, archiveUrl } from '../api/archive.js';
 import { createPlayer } from '../player.js';
 import { fromAnime, titleOf, toast, errorBox, skelRail, PLACEHOLDER } from '../ui/components.js';
-import { buildSources, episodeCount, episodeLinkMap, officialSearchLinks, streamLinks } from '../sources.js';
+import { episodeCount, episodeLinkMap } from '../sources.js';
 import { getSettings, setSetting, getMarks, toggleMark, getEntry, saveEntry, pushHistory, getPos, setPos, subscribe } from '../store.js';
 import { go } from '../router.js';
 
@@ -36,21 +36,17 @@ export default async function watch(ctx) {
   if (e0 && e0.status === 'planning') saveEntry('anime', id, { status: 'current' });
 
   const posKey = `a:${id}:${ep}`;
-  const embeds = buildSources(m, ep);
-  const hasOfficial = streamLinks(m).length > 0 || !!epInfo;
   const tabs = [
     ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
-    ...embeds.filter((s) => s.id !== 'trailer'),
-    { id: 'mkissa', kind: 'kitsune', label: 'MKissa', note: PROVIDER_ENDPOINTS.kitsuneApi ? 'MKissa anime' : 'Currently unavailable' },
+    ...(count > 0 ? [{ id: 'aniweeb', kind: 'aniweeb', label: 'Aniweeb', note: 'Alternate episode player' }] : []),
+    ...(count > 0 ? Object.entries(EXTRA_PLAYERS).map(([id, p]) => ({ id, kind: 'extra', label: p.label, note: 'Third-party episode player' })) : []),
+    ...(PROVIDER_ENDPOINTS.kitsuneApi ? [{ id: 'mkissa', kind: 'kitsune', label: 'MKissa', note: 'MKissa anime' }] : []),
     ...(PROVIDER_ENDPOINTS.kitsuneApi ? [{ id: 'kitsune', kind: 'kitsune', label: 'More servers', note: 'Additional provider mirrors' }] : []),
     ...(PROVIDER_ENDPOINTS.streamWorker ? [{ id: 'senshi', kind: 'senshi', label: 'Senshi', note: 'Kitsune-derived mirrors' }, { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' }] : []),
     ...(PROVIDER_ENDPOINTS.aniPub ? [{ id: 'anipub', kind: 'anipub', label: 'AniPub', note: 'AniPub episode source' }] : []),
-    { id: 'official', kind: 'services', label: 'Official services', note: 'Crunchyroll, Netflix & more' },
-    ...embeds.filter((s) => s.id === 'trailer'),
     { id: 'library', kind: 'library', label: 'Free library', note: 'Public-domain & Creative Commons (Internet Archive)' },
-    { id: 'mine', kind: 'mine', label: 'My file', note: 'Play a local video file (optional)' },
   ];
-  const defaultTab = tabs.find((s) => s.id === 'instant') || embeds.find((s) => s.id !== 'trailer') || (hasOfficial ? tabs.find((t) => t.id === 'official') : null) || embeds[0] || tabs.find((t) => t.id === 'official');
+  const defaultTab = tabs.find((s) => s.id === 'instant') || tabs.find((s) => s.id === 'library');
   let active = tabs.find((t) => t.id === ctx.query.src) || defaultTab;
   let player = null;
   const killPlayer = () => { player?.destroy(); player = null; };
@@ -107,7 +103,7 @@ export default async function watch(ctx) {
   paintEpisodes();
   $('#eplist .current')?.scrollIntoView({ block: 'center' });
 
-  const paintTabs = () => render($('#tabs'), tabs.map((t) => html`<button role="tab" aria-selected="${t.id === active.id ? 'true' : 'false'}" tabindex="${t.id === active.id ? '0' : '-1'}" class="chip ${t.id === active.id ? 'active' : ''}" data-src="${t.id}" title="${t.note || ''}">${t.kind === 'embed' && t.id !== 'trailer' ? icon('play') : t.kind === 'services' ? icon('globe') : t.kind === 'library' ? icon('film') : t.kind === 'mine' ? icon('link') : icon('film')} ${t.label}</button>`));
+  const paintTabs = () => render($('#tabs'), tabs.map((t) => html`<button role="tab" aria-selected="${t.id === active.id ? 'true' : 'false'}" tabindex="${t.id === active.id ? '0' : '-1'}" class="chip ${t.id === active.id ? 'active' : ''}" data-src="${t.id}" title="${t.note || ''}">${icon('film')} ${t.label}</button>`));
 
   /* ---------- progress / completion ---------- */
   const markWatched = (force) => {
@@ -119,7 +115,7 @@ export default async function watch(ctx) {
     }
     return now;
   };
-  const sourceQuery = () => ['animegg', 'anipub', 'senshi', 'kitsune', 'mkissa'].includes(active.id) ? `?src=${active.id}` : '';
+  const sourceQuery = () => ['aniweeb', 'animegg', 'anipub', 'senshi', 'kitsune', 'mkissa', ...Object.keys(EXTRA_PLAYERS)].includes(active.id) ? `?src=${active.id}` : '';
   const goNext = () => { if (ep < count) go(`/watch/${id}/${ep + 1}${sourceQuery()}`); };
   const onEnded = () => { markWatched(true); if (getSettings().autoNext) setTimeout(goNext, 1200); };
 
@@ -158,13 +154,10 @@ export default async function watch(ctx) {
     $$('.ep-row', ctx.el).forEach((row) => row.setAttribute('href', `#/watch/${id}/${row.dataset.ep}${suffix}`));
     render(panel, '');
     history.replaceState(null, '', `#/watch/${id}/${ep}${tab.id !== defaultTab.id ? `?src=${tab.id}` : ''}`);
-    if (tab.kind === 'embed') {
-      mountEmbed(tab.src, tab.label);
-      render(panel, html`<div class="notice">${icon('info')}<div>${tab.id === 'trailer' ? 'This is the official trailer / promo video.' : html`<b>${tab.label}</b> — an official free channel. Pick the episode inside the YouTube player; use <b>Mark watched</b> above to track progress.`}${tab.url ? html` <a href="${tab.url}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Open on YouTube ${icon('ext')}</a>` : ''}</div></div>`);
-    } else if (tab.kind === 'instant') instantView();
-    else if (tab.kind === 'services') servicesView();
+    if (tab.kind === 'instant') instantView();
+    else if (tab.kind === 'aniweeb') aniweebView();
+    else if (tab.kind === 'extra') extraView(tab);
     else if (tab.kind === 'library') libraryView();
-    else if (tab.kind === 'mine') mineView();
     else if (tab.kind === 'kitsune') kitsuneView(tab.id === 'mkissa' ? 'mkissa' : '');
     else if (tab.kind === 'senshi') senshiView();
     else if (tab.kind === 'animegg') animeggView();
@@ -174,23 +167,26 @@ export default async function watch(ctx) {
   /* ----- Direct episode player (Kitsune's iframe fallback) ----- */
   function instantView() {
     let audio = getSettings().instantAudio === 'dub' ? 'dub' : 'sub';
+    let protectedMode = getSettings().instantPopupProtection === true;
     let lastProgress = 0, completed = false;
     const drawPlayer = () => {
       completed = false; lastProgress = 0;
       const src = instantEmbed(id, ep, audio);
-      // MegaPlay explicitly refuses sandboxed embeds. It remains cross-origin.
-      mountEmbed(src, `${item.title} — ${epLabel}`);
+      // This host may refuse sandboxed embeds; protection is optional and never weakens other players.
+      mountEmbed(src, `${item.title} — ${epLabel}`, protectedMode);
       render(panel, html`<div class="instant-panel glass">
         <div><b>Instant play</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
         <div class="seg" aria-label="Audio language"><button type="button" data-instant-audio="sub" class="${audio === 'sub' ? 'on' : ''}" aria-pressed="${audio === 'sub'}">Sub</button><button type="button" data-instant-audio="dub" class="${audio === 'dub' ? 'on' : ''}" aria-pressed="${audio === 'dub'}">Dub</button></div>
         <button type="button" class="btn sm" data-instant-retry>${icon('refresh')} Retry player</button>
-        <p class="muted instant-help">No video link needed. The third-party player may show ads. Availability depends on the provider and your region. If playback is blocked or this episode is missing, try the other source tabs. <a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a></p>
+        <button type="button" class="btn sm" data-instant-protect aria-pressed="${protectedMode}">${icon('shield')} Popup protection: ${protectedMode ? 'on' : 'off'}</button>
+        <p class="muted instant-help">Popup protection limits new tabs and top-level redirects, but this provider may refuse to play with it on. It cannot remove ads inside the player. Try Aniweeb or disable protection if playback fails. <a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a></p>
       </div>`);
     };
     drawPlayer();
     panel.addEventListener('click', (event) => {
       if (active.kind !== 'instant') return;
       if (event.target.closest('[data-instant-retry]')) { drawPlayer(); return; }
+      if (event.target.closest('[data-instant-protect]')) { protectedMode = !protectedMode; setSetting('instantPopupProtection', protectedMode); drawPlayer(); return; }
       const button = event.target.closest('[data-instant-audio]');
       if (!button) return;
       audio = button.dataset.instantAudio;
@@ -214,6 +210,54 @@ export default async function watch(ctx) {
       if (data.event === 'complete' && !completed) { completed = true; onEnded(); }
     };
     window.addEventListener('message', onMessage, { signal: sourceController.signal });
+  }
+
+  /* A documented episode-player embed, not the upstream catalogue website. */
+  function aniweebView() {
+    let audio = getSettings().aniweebAudio === 'dub' ? 'dub' : 'sub';
+    let server = getSettings().aniweebServer === 2 ? 2 : 1;
+    const drawPlayer = () => {
+      const src = aniweebEmbed(id, ep, audio, server);
+      mountEmbed(src, `${item.title} — Aniweeb server ${server}`, true);
+      render(panel, html`<div class="instant-panel glass">
+        <div><b>Aniweeb</b><p class="muted">Episode ${ep} · Server ${server} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
+        <div class="seg" role="group" aria-label="Audio language">${['sub', 'dub'].map((a) => html`<button type="button" data-aniweeb-audio="${a}" class="${audio === a ? 'on' : ''}" aria-pressed="${audio === a}">${a === 'sub' ? 'Sub' : 'Dub'}</button>`)}</div>
+        <div class="seg" role="group" aria-label="Aniweeb server">${[1, 2].map((n) => html`<button type="button" data-aniweeb-server="${n}" class="${server === n ? 'on' : ''}" aria-pressed="${server === n}">Server ${n}</button>`)}</div>
+        <button type="button" class="btn sm" data-aniweeb-retry>${icon('refresh')} Retry player</button>
+        <p class="muted instant-help">Popup protection is enabled for this player, limiting new tabs and redirects. Ads inside the player can still appear. Switch server or try Instant play if playback fails.</p>
+      </div>`);
+    };
+    drawPlayer();
+    panel.addEventListener('click', (event) => {
+      const a = event.target.closest('[data-aniweeb-audio]');
+      const s = event.target.closest('[data-aniweeb-server]');
+      if (a) { audio = a.dataset.aniweebAudio; setSetting('aniweebAudio', audio); }
+      else if (s) { server = Number(s.dataset.aniweebServer); setSetting('aniweebServer', server); }
+      else if (!event.target.closest('[data-aniweeb-retry]')) return;
+      drawPlayer();
+    }, { signal: sourceController.signal });
+  }
+
+  /* Separate episode-player embeds, not whole provider websites. */
+  function extraView(tab) {
+    let audio = getSettings().extraAudio === 'dub' ? 'dub' : 'sub';
+    const drawPlayer = () => {
+      const src = extraEmbed(tab.id, id, ep, audio);
+      mountEmbed(src, `${item.title} — ${tab.label}`, true);
+      render(panel, html`<div class="instant-panel glass">
+        <div><b>${tab.label}</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
+        <div class="seg" role="group" aria-label="Audio language">${['sub', 'dub'].map((a) => html`<button type="button" data-extra-audio="${a}" class="${audio === a ? 'on' : ''}" aria-pressed="${audio === a}">${a === 'sub' ? 'Sub' : 'Dub'}</button>`)}</div>
+        <button type="button" class="btn sm" data-extra-retry>${icon('refresh')} Retry player</button>
+        <p class="muted instant-help">Popup protection is enabled; in-player ads may still appear. If this provider or audio track fails, try another source. Availability and playback depend on the provider.</p>
+      </div>`);
+    };
+    drawPlayer();
+    panel.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-extra-audio]');
+      if (button) { audio = button.dataset.extraAudio; setSetting('extraAudio', audio); }
+      else if (!event.target.closest('[data-extra-retry]')) return;
+      drawPlayer();
+    }, { signal: sourceController.signal });
   }
 
   /* ----- External deployments ----- */
@@ -406,27 +450,6 @@ export default async function watch(ctx) {
 
   }
 
-  /* ----- Official services launch pad ----- */
-  function servicesView() {
-    killPlayer();
-    stage.className = 'stage launch';
-    const streams = streamLinks(m);
-    const direct = epInfo?.url ? safeUrl(epInfo.url) : '';
-    render(stage, html`<div class="launchpad">
-      <div class="lp-top">
-        ${epInfo?.thumbnail ? html`<img src="${epInfo.thumbnail}" alt="" referrerpolicy="no-referrer">` : html`<img src="${item.cover || PLACEHOLDER}" alt="" referrerpolicy="no-referrer">`}
-        <div><h3>${item.title}</h3><p class="muted">${epLabel}${epInfo?.name ? ` · ${epInfo.name}` : ''}</p>
-          ${direct ? html`<a class="btn primary lg" href="${direct}" target="_blank" rel="noopener noreferrer">${icon('play')} Watch ${isMovie ? '' : `EP ${ep} `}on ${epInfo.site || hostOf(direct)}</a>` : streams[0] ? html`<a class="btn primary lg" href="${streams[0].url}" target="_blank" rel="noopener noreferrer">${icon('play')} Watch on ${streams[0].site}</a>` : html`<p class="muted">No official link is listed for this title yet — try the search shortcuts below.</p>`}
-        </div>
-      </div>
-    </div>`);
-    render(panel, html`
-      ${streams.length ? html`<h3 class="panel-h">Listed streaming services</h3><div class="stream-links">${streams.map((s) => html`<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer" style="--c:${/^#[0-9a-f]{3,8}$/i.test(s.color || '') ? s.color : 'var(--accent)'}"><span class="dot"></span><b>${s.site}</b>${s.language ? html`<small>${s.language}</small>` : ''}<span class="ext">${icon('ext')}</span></a>`)}</div>` : ''}
-      <h3 class="panel-h">Search on official services</h3>
-      <div class="stream-links">${officialSearchLinks(item.title).map((s) => html`<a class="stream-link" href="${s.url}" target="_blank" rel="noopener noreferrer" style="--c:${s.color}"><span class="dot"></span><b>${s.site}</b><span class="ext">${icon('ext')}</span></a>`)}</div>
-      <div class="notice" style="margin-top:14px">${icon('shield')}<div>Official services require no captcha from us — NullxAnime simply links you there. Several (Muse Asia, Ani-One Asia, Crunchyroll’s free tier) offer free ad-supported viewing in many regions including the Philippines.</div></div>`);
-  }
-
   /* ----- Internet Archive free library ----- */
   async function libraryView(query) {
     placeholder('film', 'Free & open library', 'Search public-domain and Creative-Commons videos from the Internet Archive.');
@@ -438,7 +461,7 @@ export default async function watch(ctx) {
       try {
         const res = await searchOpenVideo(text, 18);
         if (!ctx.alive()) return;
-        if (!res.length) { render(box, html`<div class="empty" style="padding:30px 10px"><h3>Nothing in the open library for “${text}”</h3><p>Most anime is commercially licensed, so it will not appear here. Try the official services tab, or <a href="#/free" style="color:var(--accent)">browse the free library</a>.</p></div>`); return; }
+        if (!res.length) { render(box, html`<div class="empty" style="padding:30px 10px"><h3>Nothing in the open library for “${text}”</h3><p>Most anime is commercially licensed, so it will not appear here. Try another source, or <a href="#/free" style="color:var(--accent)">browse the free library</a>.</p></div>`); return; }
         render(box, html`<div class="lib-grid">${res.map((r) => html`<button class="lib-item" data-ia="${r.id}"><img loading="lazy" src="${r.thumb}" alt="" referrerpolicy="no-referrer"><b class="clamp-2">${r.title}</b><small>${[r.creator, r.year].filter(Boolean).join(' · ')}</small></button>`)}</div>`);
       } catch (e) { render(box, errorBox(e)); }
     };
@@ -460,35 +483,6 @@ export default async function watch(ctx) {
         pick(0);
         stage.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } catch (err) { toast(err.message, 'err'); }
-    });
-  }
-
-  /* ----- Optional local file ----- */
-  function mineView() {
-    placeholder('file', 'Play a local video', 'Choose a video from your device. Only use content you have the right to watch.');
-    render(panel, html`<div class="mine-form glass"><div class="row">
-      <label class="btn primary" style="cursor:pointer">${icon('file')} Choose local file<input id="minefile" type="file" accept="video/*,.mkv,.m3u8" hidden></label>
-      <label class="btn ghost" style="cursor:pointer">${icon('file')} Subtitle file<input id="minesubfile" type="file" accept=".vtt,.srt" hidden></label>
-    </div><p class="muted">Files stay on your device.</p></div>`);
-    let subBlob = '';
-    ctx.cleanup(() => { if (subBlob) URL.revokeObjectURL(subBlob); });
-    $('#minefile', panel).addEventListener('change', (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      const url = URL.createObjectURL(f);
-      ctx.cleanup(() => URL.revokeObjectURL(url));
-      mountPlayer({ src: url, subtitle: subBlob || undefined, label: f.name, autoplay: true });
-      if (/\.mkv$/i.test(f.name)) toast('MKV support depends on your browser — MP4/WebM is the safest.');
-    });
-    $('#minesubfile', panel).addEventListener('change', async (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      const { srtToVtt } = await import('../player.js');
-      let text = await f.text();
-      if (/\.srt$/i.test(f.name)) text = srtToVtt(text);
-      if (subBlob) URL.revokeObjectURL(subBlob);
-      subBlob = URL.createObjectURL(new Blob([text], { type: 'text/vtt' }));
-      const v = $('video', stage);
-      if (v) { const tr = document.createElement('track'); tr.kind = 'subtitles'; tr.label = f.name; tr.src = subBlob; tr.default = true; v.appendChild(tr); toast('Subtitles loaded'); }
-      else toast('Subtitles will load with the next video');
     });
   }
 

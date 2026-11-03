@@ -41,6 +41,7 @@ export default async function settings(ctx) {
           <div class="seg">${[['vertical', 'Vertical'], ['ltr', 'LTR'], ['rtl', 'RTL']].map(([v, l]) => html`<button data-set="readerMode" data-v="${v}" class="${s.readerMode === v ? 'on' : ''}">${l}</button>`)}</div></div>
         <div class="set-row"><div><b>Image fit</b></div>
           <div class="seg">${[['width', 'Width'], ['height', 'Height'], ['original', 'Original']].map(([v, l]) => html`<button data-set="readerFit" data-v="${v}" class="${s.readerFit === v ? 'on' : ''}">${l}</button>`)}</div></div>
+        <div class="set-row"><div><b>18+ manga</b><small>Off by default. Includes MangaDex adult-rated titles and Omega Scans after confirming you are 18 or older. This is not age verification.</small></div>${toggle('adultManga', s.adultManga)}</div>
         <div class="set-row"><div><b>Data saver</b><small>Use compressed page images.</small></div>${toggle('readerDataSaver', s.readerDataSaver)}</div>
       </section>
 
@@ -69,7 +70,10 @@ export default async function settings(ctx) {
   draw();
   on(ctx.el, 'click', '[data-tv]', (e, t) => { setSetting('tvMode', t.dataset.tv === 'auto' ? null : t.dataset.tv === 'on'); draw(); });
   on(ctx.el, 'click', '[data-set]', (e, t) => { setSetting(t.dataset.set, t.dataset.v); draw(); });
-  on(ctx.el, 'change', '[data-tg]', (e, t) => setSetting(t.dataset.tg, t.checked));
+  on(ctx.el, 'change', '[data-tg]', (e, t) => {
+    if (t.dataset.tg === 'adultManga' && t.checked && !confirm('I confirm that I am at least 18 years old and want to see adult-rated manga on this device.')) { t.checked = false; return; }
+    setSetting(t.dataset.tg, t.checked);
+  });
   on(ctx.el, 'change', '[data-sel]', (e, t) => setSetting(t.dataset.sel, t.value));
   const q = (sel, fn) => ctx.el.addEventListener('click', (e) => { if (e.target.closest(sel)) fn(e); });
   q('#exp', () => { download(`nullxanime-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(exportAll(), null, 2)); toast('Backup downloaded'); });

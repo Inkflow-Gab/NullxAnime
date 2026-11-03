@@ -4,7 +4,7 @@ import { html, render, $, $$, on, debounce, cleanMarkdown, titleCase, copyText, 
 import { icon } from '../ui/icons.js';
 import { mangaDetail, chapterFeed, LANGS } from '../api/mangadex.js';
 import { fromManga, toast, errorBox, setStatus, PLACEHOLDER } from '../ui/components.js';
-import { getEntry, saveEntry, getMarks, toggleMark, setMarks, lastHistory, subscribe, statusLabel, STATUSES, getSettings } from '../store.js';
+import { getEntry, saveEntry, getMarks, toggleMark, setMarks, lastHistory, subscribe, statusLabel, STATUSES, getSettings, isAdultRating } from '../store.js';
 
 const chLabel = (c) => (c.chapter != null ? `${c.volume ? `Vol. ${c.volume} ` : ''}Ch. ${c.chapter}` : 'Oneshot');
 
@@ -14,6 +14,10 @@ export default async function mangaDetailPage(ctx) {
   let m;
   try { m = await mangaDetail(id); } catch (e) { ctx.render(html`<div class="container page">${errorBox(e)}</div>`); return; }
   if (!ctx.alive()) return;
+  if (isAdultRating(m.contentRating) && getSettings().adultManga !== true) {
+    ctx.render(html`<div class="container page"><div class="empty"><h3>18+ manga is off</h3><p>Adult-rated titles are hidden. Adults can opt in from Settings.</p><a class="btn primary" href="#/settings">Open Settings</a></div></div>`);
+    return;
+  }
   const item = fromManga(m);
   ctx.setTitle(item.title);
 
@@ -45,7 +49,7 @@ export default async function mangaDetailPage(ctx) {
               <span class="chip">${item.origin}</span>
               ${m.demographic ? html`<span class="chip">${titleCase(m.demographic)}</span>` : ''}
               ${m.rating ? html`<span class="chip">${icon('star')} ${m.rating.toFixed(2)}</span>` : ''}
-              ${m.contentRating === 'suggestive' ? html`<span class="chip">Suggestive</span>` : ''}
+              ${m.contentRating === 'suggestive' ? html`<span class="chip">Suggestive</span>` : ''}${isAdultRating(m.contentRating) ? html`<span class="chip">18+</span>` : ''}
             </div>
             <h1 class="detail-title">${item.title}</h1>
             ${m.altTitles.length ? html`<div class="detail-alt">${m.altTitles.slice(0, 3).join(' · ')}</div>` : ''}
@@ -126,7 +130,7 @@ export default async function mangaDetailPage(ctx) {
     $('#chfilter', root)?.addEventListener('input', (e) => { filter = e.target.value; updateChapters(); });
     on(root, 'click', '[data-read]', (e, t) => { e.preventDefault(); e.stopPropagation(); toggleMark('manga', id, t.dataset.read); }, { signal });
     on(root, 'change', '[data-track]', (e, t) => {
-      const base = { title: item.title, cover: item.cover, total: item.total, format: item.origin };
+      const base = { title: item.title, cover: item.cover, total: item.total, format: item.origin, contentRating: m.contentRating };
       if (t.dataset.track === 'status') setStatus(item, t.value);
       if (t.dataset.track === 'score') saveEntry('manga', id, { score: Number(t.value) }, base);
       if (t.dataset.track === 'progress') saveEntry('manga', id, { progress: Math.max(0, Number(t.value) || 0) }, base);

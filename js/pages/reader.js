@@ -4,7 +4,7 @@ import { html, render, $, $$, on, clamp, esc } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { chapterInfo, chapterFeed, chapterPages, mangaDetail } from '../api/mangadex.js';
 import { fromManga, toast, errorBox, popover, closePopover } from '../ui/components.js';
-import { getSettings, setSetting, pushHistory, toggleMark, getEntry, saveEntry, getPos, setPos, getMarks } from '../store.js';
+import { getSettings, setSetting, pushHistory, toggleMark, getEntry, saveEntry, getPos, setPos, getMarks, isAdultRating } from '../store.js';
 import { go } from '../router.js';
 
 const chLabel = (c) => (c?.chapter != null ? `${c.volume ? `Vol. ${c.volume} ` : ''}Ch. ${c.chapter}` : 'Oneshot');
@@ -18,6 +18,12 @@ export default async function reader(ctx) {
   let info, manga, feed, pages;
   try {
     [info, manga] = await Promise.all([chapterInfo(chapterId), mangaDetail(id)]);
+    if (!ctx.alive()) return;
+    if (String(info.mangaId) !== String(id)) throw new Error('This chapter does not belong to that manga.');
+    if (isAdultRating(manga.contentRating) && getSettings().adultManga !== true) {
+      ctx.render(html`<div class="container page"><div class="empty"><h3>18+ manga is off</h3><p>Adults can opt in from Settings before reading.</p><a class="btn primary" href="#/settings">Open Settings</a></div></div>`);
+      return;
+    }
     feed = await chapterFeed(id, info.lang || getSettings().mangaLang);
     pages = await chapterPages(chapterId, getSettings().readerDataSaver);
   } catch (e) { ctx.render(html`<div class="container page">${errorBox(e)}<p style="text-align:center"><a class="btn" href="#/manga/${id}">Back to manga</a></p></div>`); return; }
@@ -29,7 +35,7 @@ export default async function reader(ctx) {
   const prev = idx > 0 ? feed[idx - 1] : null;
   const next = idx >= 0 && idx < feed.length - 1 ? feed[idx + 1] : null;
   ctx.setTitle(`${item.title} — ${chLabel(cur)}`);
-  pushHistory({ type: 'manga', id, title: item.title, cover: item.cover, chapterId, label: chLabel(cur) });
+  pushHistory({ type: 'manga', id, title: item.title, cover: item.cover, contentRating: manga.contentRating, chapterId, label: chLabel(cur) });
 
   let s = getSettings();
   let page = clamp(Number(getPos(`m:${chapterId}`)?.pos) || 0, 0, pages.length - 1);
