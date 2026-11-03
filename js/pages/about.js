@@ -10,13 +10,13 @@ export default async function about(ctx) {
     <h2>What it does</h2>
     <ul>
       <li><b>Discover anime</b> — trending, seasonal, top-rated, full search and filters, airing schedule, characters, relations and recommendations (data from AniList).</li>
-      <li><b>Watch legally</b> — plays official free YouTube streams and trailers inline, links straight to the official service for each episode (Crunchyroll, Netflix, Muse Asia…), plays public-domain / Creative-Commons video from the Internet Archive, and can play an optional local file.</li>
-      <li><b>Read manga, manhwa &amp; manhua</b> — a full reader (vertical, LTR, RTL) on top of the open MangaDex API, with official-release links highlighted.</li>
-      <li><b>Track everything</b> — one list for anime and manga, progress, scores, history, stats, backup and MyAnimeList/AniList XML export.</li>
+      <li><b>Watch</b> — opens no-setup third-party episode players, and plays public-domain / Creative-Commons video from the Internet Archive.</li>
+      <li><b>Read manga, manhwa &amp; manhua</b> — MangaDex plus separate Asura, Vortex, Hivetoons and Omega catalogues and vertical readers. Adult titles and Omega are opt-in for adults.</li>
+      <li><b>Track anime and MangaDex manga</b> — one list for anime and manga, progress, scores, history, stats, backup and MyAnimeList/AniList XML export.</li>
     </ul>
 
     <h2>Third-party players</h2>
-    <div class="notice">${icon('shield')}<div>Instant play uses a third-party episode player; the AnimeGG worker, compatible provider API and AniPub player use external providers and deployments. Their availability, content and playback policies depend on the provider.</div></div>
+    <div class="notice">${icon('shield')}<div>Instant play, Aniweeb, SupaPlay, AniEmbed and Movies Nexus use third-party episode players; the AnimeGG worker, compatible provider API and AniPub player use external providers and deployments. Their availability, content and playback policies depend on the provider.</div></div>
 
     <h2>Credits &amp; sources</h2>
     <ul>
@@ -28,7 +28,7 @@ export default async function about(ctx) {
     </ul>
 
     <h2>Privacy</h2>
-    <p>NullxAnime has no analytics or account. Third-party players and external deployments may use cookies or analytics. Your list, history and settings are stored in your browser’s local storage. Requests go directly from your browser to AniList, MangaDex, the Internet Archive, YouTube’s privacy-enhanced player, the third-party Instant play provider when watching, and any community deployment configured by the site operator.</p>
+    <p>NullxAnime has no analytics or account. Third-party players and external deployments may use cookies or analytics. Your list, history and settings are stored in your browser’s local storage. Requests go directly from your browser to AniList, MangaDex, the Internet Archive, the selected third-party player when watching, Asura, Vortex, Hivetoons or Omega when using their respective catalogues and readers, and any community deployment configured by the site operator.</p>
 
     <h2>Copyright</h2>
     <p>All anime, manga, artwork and trademarks belong to their respective owners. If you are a rights holder and have a concern, please open an issue on the <a href="https://github.com/Inkflow-Gab/NullxAnime" target="_blank" rel="noopener">GitHub repository</a>.</p>

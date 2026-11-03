@@ -26,3 +26,7 @@ jobs:
         run: node tests/live-playback.mjs
       - name: Check Senshi browser access (non-blocking)
         run: node tests/live-senshi.mjs
+      - name: Probe additional sandboxed episode players (non-blocking)
+        run: node tests/live-extra-players.mjs
+      - name: Probe browser access to reading sources (non-blocking)
+        run: node tests/live-readers.mjs

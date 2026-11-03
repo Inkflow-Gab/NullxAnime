@@ -345,3 +345,8 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .watch-page .source-tabs .chip.active { box-shadow: 0 0 18px rgba(var(--accent-rgb), .22); }
 @media (pointer: coarse) { .watch-page .ep-row { min-height: 44px; } .watch-page .source-tabs .chip { min-height: 46px; } }
 @media (max-width: 560px) { .watch-head { flex-wrap: wrap; } .watch-head .spacer { display: none; } .watch-head > a { flex-basis: 100%; } }
+
+.asura-detail { display: grid; grid-template-columns: minmax(130px, 210px) 1fr; align-items: start; gap: 28px; margin: 24px 0; }
+.asura-poster { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius); }
+.asura-detail .detail-desc { margin: 16px 0; }
+@media (max-width: 600px) { .asura-detail { grid-template-columns: 110px 1fr; gap: 14px; } }

@@ -43,6 +43,26 @@ export function instantEmbed(id, episode, audio = 'sub') {
   return `${INSTANT_ORIGIN}/stream/ani/${Number(id)}/${episode}/${audio}`;
 }
 
+// Aniweeb publishes an AniList-keyed episode-player embed, with numbered servers.
+export function aniweebEmbed(id, episode, audio = 'sub', server = 1) {
+  if (!/^\d+$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || Number(id) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio) || ![1, 2].includes(server)) throw new Error('Invalid title, episode, audio or server.');
+  return `https://api.aniweeb.net/embed/ani/${Number(id)}/${episode}?${new URLSearchParams({ track: audio, server: String(server) })}`;
+}
+
+// Separate, documented episode-player endpoints; providers control the streams.
+export const EXTRA_PLAYERS = Object.freeze({
+  supaplay: { label: 'SupaPlay', base: 'https://supaplay.fun' },
+  aniembed: { label: 'AniEmbed · experimental', base: 'https://aniembed.se' },
+  nexus: { label: 'Movies Nexus · experimental', base: 'https://www.moviesnexus.fun' },
+});
+export function extraEmbed(provider, id, episode, audio = 'sub') {
+  if (!Object.hasOwn(EXTRA_PLAYERS, provider) || !/^\d+$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || Number(id) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid player, title, episode or audio.');
+  const base = EXTRA_PLAYERS[provider].base, title = Number(id);
+  if (provider === 'supaplay') return `${base}/stream/ani/${title}/${episode}/${audio}`;
+  if (provider === 'aniembed') return `${base}/e/${title}/${episode}?${new URLSearchParams({ lang: audio })}`;
+  return `${base}/anime/${title}/${episode}/${audio}`;
+}
+
 /** Senshi embed mirrors exposed by the separately deployed worker. */
 export function senshiWatch(base, mal, episode, audio, signal) {
   if (!Number.isSafeInteger(Number(mal)) || Number(mal) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid title, episode or audio.');

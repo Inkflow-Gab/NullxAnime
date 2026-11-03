@@ -30,19 +30,23 @@ async function launch() {
     const { default: chromium } = await import('@sparticuz/chromium');
     executablePath = await chromium.executablePath(); args = chromium.args;
   }
-  return puppeteer.launch({ executablePath, headless: 'shell', args: [...args, '--no-sandbox', '--disable-web-security', '--autoplay-policy=no-user-gesture-required'] });
+  return puppeteer.launch({ executablePath, headless: 'shell', args: [...args, '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
 }
 
 const json = (obj) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(obj) });
 
 let mockProviderEndpoints = false;
+const networkRequests = [];
 async function mockNetwork(page) {
   await page.setRequestInterception(true);
   page.on('request', (req) => {
     const url = req.url();
     const u = new URL(url);
+    networkRequests.push(url);
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && mockProviderEndpoints) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: 'https://kitsune-api.test/api', streamWorker: 'https://stream.test', aniPub: 'https://anipub.test' });" });
     if (u.origin === new URL(BASE).origin) return req.continue();
+    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
+    if (u.hostname === 'api.aniweeb.net') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Aniweeb episode mock</body></html>' });
     if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/mkissa/1000') return req.respond(json({ providers: { mkissa: { episodes: { sub: [{ id: 'watch/mkissa/1000/sub/mkissa-1', number: 1 }] } } } }));
     if (u.hostname === 'kitsune-api.test' && u.pathname.startsWith('/api/watch/mkissa/')) return req.respond(json({ sources: [{ name: 'Ok', type: 'iframe', url: 'https://senshi-embed.test/one', extractedUrl: 'https://media.test/mkissa.mp4', extractedType: 'mp4' }] }));
@@ -58,6 +62,34 @@ async function mockNetwork(page) {
     if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><iframe src="https://anipub.test/video-embed"></iframe></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname === '/video-embed') return req.respond({ status: 200, contentType: 'text/html', body: 'Episode player mock' });
     if (u.hostname === 'graphql.anilist.co') return req.respond(json(anilist(req.postData() || '{}')));
+    if (u.hostname === 'api.asurascans.com') {
+      const comic = { slug: 'mock-series', title: 'Mock Asura Manhwa', type: 'manhwa', status: 'ongoing', cover: 'https://cdn.asurascans.com/asura-images/covers/mock.webp', description: '<p>A mock series.</p>', chapter_count: 2 };
+      const chapters = [{ number: 2, is_premium: true, page_count: 2 }, { number: 1, is_premium: false, page_count: 3 }];
+      if (u.pathname === '/api/series') return req.respond(json({ data: [comic], meta: { total: 1 } }));
+      if (u.pathname === '/api/series/mock-series') return req.respond(json({ series: comic }));
+      if (u.pathname === '/api/series/mock-series/chapters') return req.respond(json({ data: chapters }));
+      if (u.pathname === '/api/series/mock-series/chapters/1') return req.respond(json({ data: { is_locked: false, chapter: { number: 1, series_slug: 'mock-series', pages: [1, 2, 3].map((i) => ({ url: `https://cdn.asurascans.com/asura-images/chapters/mock-series/1/${i}.webp` })) } } }));
+      return req.respond({ status: 404, body: '' });
+    }
+    if (u.hostname === 'api.vortexscans.org' || u.hostname === 'api.hivetoons.org') {
+      const host = u.hostname === 'api.vortexscans.org' ? 'storage.vortexscans.org' : 'storage.hivetoon.com';
+      const comic = { id: 709, slug: 'mock-iken', postTitle: 'Mock Iken', seriesType: 'MANHWA', seriesStatus: 'ONGOING', featuredImage: `https://${host}/upload/cover.webp`, postContent: 'A series' };
+      const chapters = [{ id: 2, number: 2, isLocked: true, isAccessible: false, price: 100 }, { id: 3, number: 3, isShortLinkLocked: true, isAccessible: true, price: 0 }, { id: 1, number: 1, isLocked: false, isAccessible: true, price: 0 }];
+      if (u.pathname === '/api/query') return req.respond(json({ posts: [comic], totalCount: 1 }));
+      if (u.pathname === '/api/post') return req.respond(json({ post: comic }));
+      if (u.pathname === '/api/chapters') return req.respond(json({ post: { chapters } }));
+      if (u.pathname === '/api/chapter') return req.respond(json({ chapter: { id: 1, mangaPostId: 709, price: 0, images: [{ order: 1, url: `https://${host}/upload/2.webp` }, { order: 0, url: `https://${host}/upload/1.webp` }, { order: 2, url: 'https://evil.example/page.webp' }] } }));
+      return req.respond({ status: 404, body: '' });
+    }
+    if (u.hostname === 'api.omegascans.org') {
+      const comic = { id: 758, series_slug: 'mock-omega', title: 'Mock Omega', series_type: 'Comic', status: 'Ongoing', thumbnail: 'https://media.omegascans.org/file/cover.webp', description: 'Adult catalogue' };
+      const chapters = [{ chapter_slug: 'chapter-2', chapter_name: 'Chapter 2', price: 10 }, { chapter_slug: 'chapter-1', chapter_name: 'Chapter 1', price: 0 }];
+      if (u.pathname === '/query') return req.respond(json({ data: [comic], meta: { current_page: 1, last_page: 1 } }));
+      if (u.pathname === '/series/mock-omega') return req.respond(json(comic));
+      if (u.pathname === '/chapter/query') return req.respond(json({ data: chapters }));
+      if (u.pathname === '/chapter/mock-omega/chapter-1') return req.respond(json({ chapter: { series_id: 758, chapter_slug: 'chapter-1', price: 0, chapter_data: { images: ['https://media.omegascans.org/file/1.webp', 'https://evil.example/2.webp'] } } }));
+      return req.respond({ status: 404, body: '' });
+    }
     if (u.hostname === 'api.mangadex.org') return req.respond(json(mangadex(url)));
     if (u.hostname === 'archive.org' && !u.pathname.startsWith('/download') && !u.pathname.startsWith('/services')) return req.respond(json(archive(url)));
     if (/\.(jpg|jpeg|png|webp)(\?|$)|services\/img|\/uploads\.mangadex/i.test(url) || /anilist|mangadex|archive\.org\/services/.test(u.hostname + u.pathname)) {
@@ -110,7 +142,7 @@ try {
   check('detail page', await visit('/anime/1000', '.detail-title', { shot: 'anime' }) && (await text('.detail-title')).length > 2);
   check('detail strips <script> from synopsis', !(await page.$eval('#desc', (e) => e.innerHTML)).includes('<script') && (await page.$eval('#desc', (e) => e.innerHTML)).includes('<i>unforgettable</i>'));
   check('detail lists episodes', (await count('.ep')) >= 5);
-  check('detail has official stream links', (await count('.stream-link')) >= 2);
+  check('detail omits official streams and trailers', (await count('.stream-link, [data-trailer]')) === 0);
   check('anime mark toggles once after repeated redraws', await (async () => {
     for (let i = 0; i < 3; i++) { await page.$eval('[data-mark="1"]', (e) => e.click()); }
     const marked = (await page.$eval('[data-mark="1"]', (e) => e.getAttribute('aria-label'))) === 'Mark unwatched';
@@ -129,12 +161,7 @@ try {
     return renders > 0 && renders <= 2;
   }));
   check('watch page defaults to the episode player without setup', await visit('/watch/1000/1', '#stage iframe', { shot: 'watch' }) && await page.$eval('#stage iframe', (e) => e.src === 'https://megaplay.buzz/stream/ani/1000/1/sub' && !e.hasAttribute('sandbox')) && !(await page.$('#deployment-url')));
-  check('MKissa reports unavailable without asking for a link', await (async () => {
-    await page.$eval('[data-src="mkissa"]', (e) => e.click());
-    const unavailable = (await text('#panel')).includes('needs a server') && !(await page.$('#panel input[type="url"]')) && !(await page.$('[data-src="kitsune"]'));
-    await page.click('#use-instant');
-    return unavailable && await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
-  })());
+  check('unavailable MKissa is not presented as a playable provider', !(await page.$('[data-src="mkissa"]')));
   check('instant player remembers audio and episode', await (async () => {
     await page.click('[data-instant-audio="dub"]');
     const switched = await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/dub'));
@@ -143,6 +170,13 @@ try {
     const ok = switched && (await page.$eval('[data-instant-audio="dub"]', (e) => e.getAttribute('aria-pressed') === 'true'));
     await visit('/watch/1000/1', '#stage iframe'); await page.click('[data-instant-audio="sub"]');
     return ok && await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
+  })());
+  check('optional popup protection constrains the instant player', await (async () => {
+    await page.$eval('[data-instant-protect]', (e) => e.click());
+    const sandbox = await page.$eval('#stage iframe', (f) => f.getAttribute('sandbox'));
+    const on = await page.$eval('[data-instant-protect]', (e) => e.getAttribute('aria-pressed') === 'true');
+    await page.$eval('[data-instant-protect]', (e) => e.click());
+    return on && sandbox && !sandbox.includes('allow-popups') && !sandbox.includes('allow-top-navigation') && !(await page.$eval('#stage iframe', (f) => f.hasAttribute('sandbox')));
   })());
   check('instant player ignores messages from other windows', await (async () => {
     await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', { origin: 'https://megaplay.buzz', source: window, data: { event: 'complete', currentTime: 60, duration: 60 } })));
@@ -159,18 +193,29 @@ try {
     await page.click('[data-instant-retry]');
     return await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
   })());
-  check('official YouTube source remains available', await (async () => {
-    await page.$eval('[data-src="yt-0"]', (e) => e.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }));
-    await page.click('[data-src="yt-0"]');
-    return (await page.$eval('#stage iframe', (e) => e.src)).startsWith('https://www.youtube-nocookie.com/embed/');
+  check('unwanted watch tabs are removed', await (async () => !(await page.$('[data-src="yt-0"]')) && !(await page.$('[data-src="trailer"]')) && !(await page.$('[data-src="mine"]')) && !(await page.$('[data-src="official"]')))());
+  check('Aniweeb offers built-in episode servers', await (async () => {
+    await page.$eval('[data-src="aniweeb"]', (e) => e.click());
+    const first = await page.$eval('#stage iframe', (e) => e.src === 'https://api.aniweeb.net/embed/ani/1000/1?track=sub&server=1');
+    await page.$eval('[data-aniweeb-server="2"]', (e) => e.click());
+    await page.$eval('[data-aniweeb-audio="dub"]', (e) => e.click());
+    return first && await page.$eval('#stage iframe', (e) => e.src === 'https://api.aniweeb.net/embed/ani/1000/1?track=dub&server=2') && !(await page.$('#panel input[type="url"]'));
+  })());
+  check('additional episode players use sandboxed embeds and audio choices', await (async () => {
+    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun']]) {
+      await page.$eval(`[data-src="${id}"]`, (e) => e.click());
+      const first = await page.$eval('#stage iframe', (f) => ({ host: new URL(f.src).hostname, sandbox: f.getAttribute('sandbox') }));
+      if (first.host !== host || !first.sandbox || first.sandbox.includes('allow-popups')) return false;
+      await page.$eval('[data-extra-audio="dub"]', (e) => e.click());
+      const src = await page.$eval('#stage iframe', (f) => f.src);
+      if (!src.includes('dub')) return false;
+      await page.$eval('[data-extra-audio="sub"]', (e) => e.click());
+    }
+    return true;
   })());
   check('watch source tabs support keyboard navigation', await (async () => {
     await page.focus('#tabs [role="tab"][aria-selected="true"]'); await page.keyboard.press('End');
-    return (await page.$eval('#tabs [data-src="mine"]', (e) => e.getAttribute('aria-selected'))) === 'true';
-  })());
-  check('optional local file player has no URL fields', await (async () => {
-    const hasFile = !!(await page.$('#minefile'));
-    return hasFile && !(await page.$('#panel input[type="url"]'));
+    return (await page.$eval('#tabs [data-src="library"]', (e) => e.getAttribute('aria-selected'))) === 'true';
   })());
   mockProviderEndpoints = true;
   await visit('/watch/1000/1', '#stage iframe');
@@ -224,8 +269,6 @@ try {
     return source.kind === 'video' && source.url === 'https://anipub.test/videos/episode.mp4';
   }));
   mockProviderEndpoints = false;
-  check('watch → official services tab', await (async () => { await page.click('[data-src="official"]'); await page.waitForSelector('.launchpad'); return true; })());
-  await page.screenshot({ path: SHOTS ? new URL('./__screens__/watch-official.png', import.meta.url).pathname : '/dev/null' }).catch(() => {});
   check('watch → free library tab lists results', await (async () => { await page.click('[data-src="library"]'); await page.waitForSelector('.lib-item', { timeout: 6000 }); return true; })());
   check('watch → library item plays in custom player', await (async () => { await page.click('.lib-item'); await page.waitForSelector('.vp video', { timeout: 6000 }); return true; })());
   check('player shortcuts do not steal arrows from other controls', await page.evaluate(() => {
@@ -237,6 +280,14 @@ try {
   check('mark watched updates tracker', await (async () => { await visit('/watch/1000/2', '#markbtn'); await page.click('#markbtn'); await new Promise((r) => setTimeout(r, 300)); const s = JSON.parse(await page.evaluate(() => localStorage.getItem('nx:marks'))); return s['anime:1000']?.includes(2); })());
   check('search page', await visit('/search?type=anime&q=frieren', '.grid .card', { shot: 'search' }));
   check('browse by genre', await visit('/search?type=anime&genre=Action', '.grid .card'));
+  check('recent episodes are paginated and link to the episode', await (async () => {
+    if (!(await visit('/releases', '#release-grid .card'))) return false;
+    const first = await count('#release-grid .card');
+    const href = await page.$eval('#release-grid .poster', (e) => e.getAttribute('href'));
+    await page.$eval('#release-load', (e) => e.click());
+    await page.waitForFunction((n) => document.querySelectorAll('#release-grid .card').length > n, {}, first);
+    return first === 6 && href === '#/watch/1000/1' && await count('#release-grid .card') === 12 && await page.$eval('#release-more', (e) => e.hidden);
+  })());
   check('schedule', await visit('/schedule', '.sched-row', { shot: 'schedule' }));
 
   console.log('Manga');
@@ -246,6 +297,43 @@ try {
     await page.$eval('#mhero [data-dot="1"]', (e) => e.click());
     const slides = await count('.mhero-slide');
     return before === 2 * (slides - 1) && await page.$eval('.mhero-slide.active .mhero-bg', (img) => !!img.getAttribute('src'));
+  })());
+  check('Asura catalogue, unlocked chapters and reader', await (async () => {
+    await page.$eval('a[href="#/asura"]', (e) => e.click());
+    await page.waitForSelector('#asura-grid .card', { timeout: 10000 });
+    await page.$eval('#asura-grid .poster', (e) => e.click());
+    await page.waitForSelector('.asura-detail', { timeout: 10000 });
+    const chapterLinks = await page.$$eval('.ch-list .ch', (links) => links.map((a) => a.getAttribute('href')));
+    await page.$eval('.ch-list .ch', (e) => e.click());
+    await page.waitForSelector('.reader .rpage', { timeout: 10000 });
+    const images = await page.$$eval('.reader .rpage', (imgs) => imgs.map((img) => img.getAttribute('src')));
+    const lazy = await page.$$eval('.reader .rpage', (imgs) => imgs.at(-1)?.getAttribute('loading'));
+    return chapterLinks.length === 1 && chapterLinks[0] === '#/asura/mock-series/1' && images.length === 3 && images[0].startsWith('https://cdn.asurascans.com/asura-images/') && lazy === 'lazy';
+  })());
+  for (const source of ['vortex', 'hive']) {
+    check(`${source} catalogue and free chapter reader`, await (async () => {
+      await visit(`/scans/${source}`, '#scans-grid .card', { timeout: 10000 });
+      await page.$eval('#scans-grid .poster', (e) => e.click());
+      await page.waitForSelector('.ch-list .ch', { timeout: 10000 });
+      const chapters = await page.$$eval('.ch-list .ch', (links) => links.map((a) => a.getAttribute('href')));
+      await page.$eval('.ch-list .ch', (e) => e.click());
+      await page.waitForSelector('.reader .rpage', { timeout: 10000 });
+      const images = await page.$$eval('.reader .rpage', (imgs) => imgs.map((img) => img.getAttribute('src')));
+      return chapters.length === 1 && chapters[0].endsWith('/mock-iken/1') && images.length === 2 && images[0].endsWith('/1.webp');
+    })());
+  }
+  check('locked Vortex chapter is not requested directly', await (async () => {
+    const before = networkRequests.filter((u) => u.includes('/api/chapter?chapterId=2')).length;
+    await visit('/scans/vortex/mock-iken/2', '.page');
+    await page.waitForFunction(() => document.querySelector('.page')?.textContent.includes('unavailable or locked'), { timeout: 10000 });
+    const after = networkRequests.filter((u) => u.includes('/api/chapter?chapterId=2')).length;
+    return before === after;
+  })());
+  check('Omega is blocked by default without network requests', await (async () => {
+    const before = networkRequests.filter((u) => u.includes('api.omegascans.org')).length;
+    await visit('/scans/omega/mock-omega/chapter-1', '.page h1');
+    const after = networkRequests.filter((u) => u.includes('api.omegascans.org')).length;
+    return before === after && (await text('.page h1')).includes('Adults only');
   })());
   check('manga detail with chapters', await visit('/manga/00000000-0000-4000-8000-000000000000', '.ch', { shot: 'manga-detail' }) && (await count('.ch')) === 30);
   check('manga read mark toggles once after repeated redraws', await (async () => {
@@ -261,6 +349,41 @@ try {
     return a === '1 / 8' && b === '2 / 8';
   })());
   await page.evaluate(() => localStorage.removeItem('nx:settings'));
+
+  check('adult manga is blocked by default, including direct reader links', await (async () => {
+    const adultId = '00000000-0000-4000-8000-000000000009';
+    const chapter = '11111111-0000-4000-8000-000000009001';
+    await visit(`/manga/${adultId}`, '.empty');
+    const detailBlocked = (await text('.empty')).includes('18+ manga is off');
+    const before = networkRequests.filter((u) => u.includes(`/at-home/server/${chapter}`)).length;
+    await visit(`/read/${adultId}/${chapter}`, '.empty');
+    const after = networkRequests.filter((u) => u.includes(`/at-home/server/${chapter}`)).length;
+    return detailBlocked && (await text('.empty')).includes('18+ manga is off') && before === after;
+  })());
+  check('18+ opt-in enables adult search and reader; turning it off hides history', await (async () => {
+    await visit('/settings', '[data-tg="adultManga"]');
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.$eval('[data-tg="adultManga"]', (e) => e.click());
+    await visit('/search?type=manga&rating=adult', '.grid .card');
+    const badge = (await text('.grid .card')).includes('18+');
+    await visit('/scans/omega', '#scans-grid .card', { timeout: 10000 });
+    await page.$eval('#scans-grid .poster', (e) => e.click());
+    await page.waitForSelector('.ch-list .ch', { timeout: 10000 });
+    const omegaChapters = await page.$$eval('.ch-list .ch', (links) => links.map((a) => a.getAttribute('href')));
+    await page.$eval('.ch-list .ch', (e) => e.click());
+    await page.waitForSelector('.reader .rpage', { timeout: 10000 });
+    const omegaPages = await page.$$eval('.reader .rpage', (imgs) => imgs.map((img) => img.getAttribute('src')));
+    const omegaOk = omegaChapters.length === 1 && omegaChapters[0].endsWith('/chapter-1') && omegaPages.length === 1 && omegaPages[0].startsWith('https://media.omegascans.org/');
+    const adultId = '00000000-0000-4000-8000-000000000009';
+    const chapter = '11111111-0000-4000-8000-000000009001';
+    const requested = networkRequests.some((u) => u.includes('/manga?') && new URL(u).searchParams.getAll('contentRating[]').includes('pornographic'));
+    await visit(`/read/${adultId}/${chapter}`, '.reader .rwrap');
+    const pages = (await count('.rwrap')) === 8;
+    await visit('/settings', '[data-tg="adultManga"]');
+    await page.$eval('[data-tg="adultManga"]', (e) => e.click());
+    const hidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('manga').some((h) => h.contentRating === 'erotica'));
+    return badge && requested && pages && hidden && omegaOk;
+  })());
 
   console.log('Tracker, discover, settings');
   check('add to list from card menu', await (async () => {
@@ -314,6 +437,17 @@ try {
     await visit('/settings', '[data-tv="auto"]');
     return automatic && overridden;
   })());
+  check('brand animation respects reduced motion and lightweight mode', await (async () => {
+    await page.evaluate(async () => { const s = await import('./js/store.js'); s.setSetting('performanceMode', 'off'); s.setSetting('reduceMotion', false); });
+    const normal = await page.$eval('.topbar .brand img', (e) => getComputedStyle(e).animationName);
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    const reduced = await page.$eval('.topbar .brand img', (e) => getComputedStyle(e).animationName);
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'on'));
+    const light = await page.$eval('.topbar .brand img', (e) => getComputedStyle(e).animationName);
+    await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'auto'));
+    return normal === 'brand-flourish' && reduced === 'none' && light === 'none';
+  })());
   check('footer glitch respects reduced motion', await (async () => {
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     const result = await page.$eval('.dev-name', (e) => getComputedStyle(e, '::before').animationName === 'none');
@@ -342,6 +476,7 @@ try {
   await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
   check('small phone home stays within viewport', await visit('/', '.hero-slide.active') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   check('small phone watch page stays within viewport', await visit('/watch/1000/1', '#stage') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  check('small phone scan reader stays within viewport', await visit('/scans/vortex/mock-iken/1', '.reader .rpage', { timeout: 10000 }) && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   check('no uncaught JS / console errors', errors.length === 0, `\n    ${errors.slice(0, 6).join('\n    ')}`);
   failed = results.filter((r) => !r.ok).length;

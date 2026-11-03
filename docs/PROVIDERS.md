@@ -4,7 +4,11 @@
 
 ### Instant play
 
-The default **Instant play** tab embeds `https://megaplay.buzz/stream/ani/{anilistId}/{episode}/{sub|dub}`, the fallback used in Kitsune's watch player. Sub/dub choice is remembered across episodes. This is a third-party iframe, not a bundled video server. The provider rejects sandboxed embeds, so it is embedded without an iframe sandbox (the normal cross-origin boundary still applies): GitHub Pages does not fetch or proxy its video, so browser CORS is not needed for the embed. Its operator controls availability, content and embedding; autoplay, subtitle/dub coverage, network access, regional blocks, third-party cookies and browser support may vary. If it does not load, use another source tab. We cannot guarantee playback or test live providers from this sandbox.
+The default **Instant play** tab embeds `https://megaplay.buzz/stream/ani/{anilistId}/{episode}/{sub|dub}`, the fallback used in Kitsune's watch player. Sub/dub choice is remembered across episodes. This is a third-party iframe, not a bundled video server. The provider has rejected sandboxed embeds, so it defaults to an unsandboxed iframe (the normal cross-origin boundary still applies). An optional popup-protection button adds a sandbox that blocks new windows and top-level navigation but may break this provider: GitHub Pages does not fetch or proxy its video, so browser CORS is not needed for the embed. Its operator controls availability, content and embedding; autoplay, subtitle/dub coverage, network access, regional blocks, third-party cookies and browser support may vary. If it does not load, use another source tab. We cannot guarantee playback or test live providers from this sandbox.
+
+### Additional episode-player embeds
+
+SupaPlay (`/stream/ani/{id}/{episode}/{sub|dub}`), AniEmbed (`/e/{id}/{episode}?lang=sub|dub`) and Movies Nexus (`/anime/{id}/{episode}/{sub|dub}`) are separate episode-player iframe endpoints. They are sandboxed without popup or top-level navigation permissions. Source selection and audio are mock-tested. A Pages-origin CI probe observed progress for one SupaPlay episode; no video progress was observed for AniEmbed or Movies Nexus, which are labelled experimental. Non-blocking CI probes attempt playback of one sampled episode inside the same sandbox; a failed probe does not establish universal failure, nor does a pass guarantee other episodes, regions, or ad-free behavior. The providers control their content, availability and player behavior.
 
 ### AnimeGG provider (adapted from Kitsune)
 
@@ -36,9 +40,9 @@ The adapter recognizes all 12 providers listed below, but this repository does *
 
 ### MKissa anime and manga
 
-When a backend is configured, the **MKissa** tab selects MKissa on the compatible provider API and uses its filtered `/episodes/mkissa/{anilistId}?map=false` endpoint. It understands MKissa's `sources` response, including extracted HLS/MP4 and supported embed mirrors. This is a frontend adapter, **not** an MKissa server: a separately hosted, CORS-enabled, hardened API with MKissa support and a working proxy is required. No MKissa backend is deployed by this repository, so the tab displays an unavailable notice and real MKissa playback has not been verified. Viewers are never asked to enter a URL. MKissa may require a security check; the app does not solve or bypass it. Complete any check through the provider, though that authorization may not transfer to the API host.
+When a backend is configured, the **MKissa** tab selects MKissa on the compatible provider API and uses its filtered `/episodes/mkissa/{anilistId}?map=false` endpoint. It understands MKissa's `sources` response, including extracted HLS/MP4 and supported embed mirrors. This is a frontend adapter, **not** an MKissa server: a separately hosted, CORS-enabled, hardened API with MKissa support and a working proxy is required. No MKissa backend is deployed by this repository, so the tab is hidden and real MKissa playback has not been verified. A public Anivexa endpoint observed in another project was paused, and the Anisurge scraper returned not-found for MKissa on several sample titles; neither is configured as a working substitute. Viewers are never asked to enter a URL. MKissa may require a security check; the app does not solve or bypass it. Complete any check through the provider, though that authorization may not transfer to the API host.
 
-MKissa also has a manga catalogue (see [AllManga extension](https://github.com/keiyoushi/extensions-source/tree/main/src/en/allanime)), but its page extraction uses a protected browser flow, not the Kitsune anime API. **MKissa manga is not integrated**; NullxAnime's existing manga catalogue and reader remain MangaDex. No MKissa website is embedded. A future implementation needs a permitted, supported page source and must handle access checks without bypassing them.
+MKissa also has a manga catalogue (see [AllManga extension](https://github.com/keiyoushi/extensions-source/tree/main/src/en/allanime)), but its page extraction uses a protected browser flow, not the Kitsune anime API. **MKissa manga is not integrated**; NullxAnime has separate MangaDex and Asura catalogues and readers. No MKissa website is embedded. A future implementation needs a permitted, supported page source and must handle access checks without bypassing them.
 
 ### Upstream coverage
 
@@ -54,23 +58,25 @@ Do not put credentials in deployment URLs. External providers and deployment ope
 
 ## Built-in sources
 
-Sources are described in `js/sources.js` (`buildSources`) and rendered in `js/pages/watch.js`.
+Episode players are configured in `js/pages/watch.js`. Aniweeb uses its documented `/embed/ani/{anilistId}/{episode}?track=sub|dub&server=1..2` player route. Its numbered servers do not identify themselves as MKissa. The browser contacts Aniweeb directly; its availability, content, ads, regional behavior and playback are outside this project. The sample player page responded during development, but live video playback was not verified.
 Each tab on the watch page has a `kind`:
 
 | kind | what it does |
 | --- | --- |
-| `embed` | shows `src` in a sandbox-friendly `<iframe>` (used for official YouTube streams & trailers) |
-| `services` | launch pad with links to official services |
+| `instant` / `aniweeb` | documented episode-player embeds (third party) |
 | `library` | Internet Archive search + custom player |
-| `mine` | an optional local file in the custom player |
 
-To add one (e.g. a **licensed** service with an embed API, or your own media server):
+For maintainers: integrate a provider only where its access and embedding are permitted.
 
-1. Return a descriptor from `buildSources(media, ep)`:
-   ```js
-   out.push({ id: 'my-server', kind: 'embed', label: 'My server', note: 'Hosted by me', src: `https://media.example.com/embed/${media.id}/${ep}` });
-   ```
-2. For anything with a custom UI, add a new `kind` branch to `select()` in `watch.js` next to `libraryView()` / `mineView()`. Use `mountPlayer({ src })` for direct MP4/HLS URLs.
-3. Test provider errors, availability, and browser CORS/embedding behavior.
+
+Asura's reader uses `https://api.asurascans.com/api` directly for catalogue, unlocked chapter metadata and page URLs; images are loaded directly as images. The implementation is independent of the Android extension and cannot install APKs. It does not bypass challenges or paid chapters. CORS, hotlinking and availability may change. Metadata and chapter JSON were observed for a sample title, but browser image rendering on the deployed origin has not been verified. MangaFire, Toonily and MKissa manga have no integrated reader here; several need different access, cross-origin handling or a server.
 
 AniList data is fetched by `js/api/anilist.js`; adding fields to the `CARD` fragment makes them available on every card.
+
+### Other manga sources
+
+Omega Scans, Vortex Scans and Hivetoons have separate clients in `js/api/scans.js` and an image reader in `js/pages/scans.js`. They request public JSON directly, limit request rate, filter paid and locked chapters, validate series and image origins, and never embed an upstream website or execute its ad scripts. Omega's entire catalogue is behind the existing local 18+ self-attestation, including direct links. The Iken and HeanCMS API shapes were informed by the [Mangayomi Iken extension](https://github.com/m2k3a/mangayomi-extensions) and [Keiyoushi HeanCMS extension](https://github.com/keiyoushi/extensions-source); no extension APKs are installed. No login or bypass for paid chapters, access checks or CAPTCHA is implemented. Test fixtures cover catalogue, gating, locked chapters and image URLs. Live catalogue, chapter list and page URL JSON were observed, and non-blocking CI checks Pages-origin CORS plus a sample cover and chapter page (not every title or region). Hivetoons sample cover did not load in CI and the catalogue is marked experimental. Providers can block or change access; Omega returned a 502 during one request. These source readers do not sync to the MangaDex tracker.
+
+### Ads and redirects
+
+Aniweeb and configured third-party mirrors run in sandboxed iframes without popup or top-navigation permissions. Instant play has an opt-in sandbox because the provider may refuse to play in one. Sandboxing can prevent popup windows and parent-page redirects; it cannot inspect or block ads, redirects within the frame, tracking, or embedded ad media. A third-party player or browser may still fail. No provider security challenges are automatically bypassed.

@@ -40,7 +40,7 @@ export function fromManga(m) {
   return register({
     type: 'manga', id: m.id, title: m.title, cover: m.cover, score: null, sub: bits.join(' · '),
     total: m.lastChapter && /^\d+$/.test(m.lastChapter) ? Number(m.lastChapter) : null, format: origin, status: m.status,
-    href: `#/manga/${m.id}`, raw: m, origin,
+    href: `#/manga/${m.id}`, raw: m, origin, contentRating: m.contentRating,
   });
 }
 
@@ -50,6 +50,7 @@ export function card(item, opts = {}) {
   const s = getSettings();
   const next = item.next;
   const badges = [];
+  if (item.type === 'manga' && ['erotica', 'pornographic'].includes(item.contentRating)) badges.push(html`<span class="badge">18+</span>`);
   if (item.score) badges.push(html`<span class="badge score">${icon('star')}${item.score}</span>`);
   if (item.type === 'manga' && item.origin && item.origin !== 'Manga') badges.push(html`<span class="badge accent">${item.origin}</span>`);
   const bl = [];
@@ -172,7 +173,7 @@ export function setStatus(item, status) {
   if (status === '__remove') { removeEntry(item.type, item.id); toast('Removed from your list'); return; }
   const patch = { status };
   if (status === 'completed' && item.total) patch.progress = item.total;
-  saveEntry(item.type, item.id, patch, { title: item.title, cover: item.cover, total: item.total, format: item.format });
+  saveEntry(item.type, item.id, patch, { title: item.title, cover: item.cover, total: item.total, format: item.format, contentRating: item.contentRating });
   toast(`Added to “${statusLabel(status, item.type)}”`);
 }
 

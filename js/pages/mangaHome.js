@@ -24,7 +24,7 @@ export default async function mangaHomePage(ctx) {
       <div class="mhero-inner">
         <img class="mhero-cover" ${i === 0 ? html`src="${it.cover}"` : html`data-hero-src="${it.cover}"`} alt="" referrerpolicy="no-referrer">
         <div class="mhero-text">
-          <div class="chips"><span class="badge accent">${icon('flame')} #${i + 1} Popular</span>${it.origin !== 'Manga' ? html`<span class="badge">${it.origin}</span>` : ''}${it.raw.status ? html`<span class="badge">${titleCase(it.raw.status)}</span>` : ''}</div>
+          <div class="chips"><span class="badge accent">${icon('flame')} #${i + 1} Popular</span>${it.origin !== 'Manga' ? html`<span class="badge">${it.origin}</span>` : ''}${['erotica', 'pornographic'].includes(it.contentRating) ? html`<span class="badge">18+</span>` : ''}${it.raw.status ? html`<span class="badge">${titleCase(it.raw.status)}</span>` : ''}</div>
           <h1>${it.title}</h1>
           <p class="clamp-3">${mdPlain(it.raw.description)}</p>
           <div class="chips">${it.raw.tags.filter((t) => t.group === 'genre').slice(0, 4).map((t) => html`<span class="chip">${t.name}</span>`)}</div>
@@ -34,6 +34,11 @@ export default async function mangaHomePage(ctx) {
       <div class="hero-dots">${feat.map((_, i) => html`<button data-dot="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Slide ${i + 1}"></button>`)}</div></section>` : ''}
 
     <div class="quick-tiles">
+      ${getSettings().adultManga === true ? html`<a class="tile" href="#/search?type=manga&rating=adult"><span class="tile-ic">${icon('book')}</span><span><b>18+ manga</b><small>Adult-rated MangaDex titles</small></span></a>` : ''}
+      <a class="tile" href="#/asura"><span class="tile-ic">${icon('book')}</span><span><b>Asura Scans</b><small>Browse and read Asura's own catalogue</small></span></a>
+      <a class="tile" href="#/scans/vortex"><span class="tile-ic">${icon('book')}</span><span><b>Vortex Scans</b><small>Free chapters from Vortex</small></span></a>
+      <a class="tile" href="#/scans/hive"><span class="tile-ic">${icon('book')}</span><span><b>Hivetoons · experimental</b><small>Images may be blocked</small></span></a>
+      ${getSettings().adultManga === true ? html`<a class="tile" href="#/scans/omega"><span class="tile-ic">${icon('book')}</span><span><b>Omega Scans · 18+</b><small>Adult catalogue</small></span></a>` : ''}
       <button class="tile" id="random"><span class="tile-ic">${icon('shuffle')}</span><span><b>Surprise me</b><small>Open a random manga</small></span></button>
       <a class="tile" href="#/search?type=manga&origin=ko"><span class="tile-ic">${icon('scroll')}</span><span><b>Manhwa</b><small>Korean webtoons</small></span></a>
       <a class="tile" href="#/search?type=manga&origin=zh"><span class="tile-ic">${icon('layers')}</span><span><b>Manhua</b><small>Chinese comics</small></span></a>

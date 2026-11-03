@@ -21,11 +21,16 @@ export const DEFAULT_SETTINGS = {
   accent: 'violet',
   titleLang: 'romaji',    // romaji | english | native
   mangaLang: 'en',
+  adultManga: false, // opt-in and local self-attestation, not age verification
   readerMode: 'vertical', // vertical | ltr | rtl
   readerFit: 'width',     // width | height | original
   readerDataSaver: false,
   autoNext: true,
   instantAudio: 'sub',
+  instantPopupProtection: false, // opt-in: MegaPlay may refuse sandboxed playback
+  aniweebAudio: 'sub',
+  extraAudio: 'sub',
+  aniweebServer: 1,
   kitsuneAudio: 'sub',
   autoplay: true,
   reduceMotion: false,
@@ -69,7 +74,9 @@ export const statusLabel = (status, type) => ({
 let library = read('library', {});
 const libKey = (type, id) => `${type}:${id}`;
 export const getEntry = (type, id) => library[libKey(type, id)] || null;
-export const allEntries = (type) => Object.values(library).filter((e) => !type || e.type === type);
+export const isAdultRating = (rating) => rating === 'erotica' || rating === 'pornographic';
+const visibleEntry = (e) => settings.adultManga === true || !isAdultRating(e.contentRating);
+export const allEntries = (type) => Object.values(library).filter((e) => (!type || e.type === type) && visibleEntry(e));
 export function saveEntry(type, id, patch, base = {}) {
   const k = libKey(type, id);
   const prev = library[k];
@@ -93,7 +100,7 @@ export function removeEntry(type, id) {
 /* ---------------- Watch / read history ------------------------------------------ */
 // item = { type, id, title, cover, ep|chapterId, label, at, pos, dur }
 let history = read('history', []);
-export const getHistory = (type) => history.filter((h) => !type || h.type === type);
+export const getHistory = (type) => history.filter((h) => (!type || h.type === type) && visibleEntry(h));
 export function pushHistory(item) {
   history = history.filter((h) => !(h.type === item.type && String(h.id) === String(item.id)));
   history.unshift({ ...item, at: Date.now() });
@@ -168,7 +175,7 @@ export function exportAll() {
 }
 export function importAll(data, { merge = true } = {}) {
   if (!data || data.app !== 'NullxAnime') throw new Error('This file is not a NullxAnime backup.');
-  if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings }; write('settings', settings); applySettings(); }
+  if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings, adultManga: false }; write('settings', settings); applySettings(); }
   if (data.library) { library = merge ? { ...library, ...data.library } : data.library; write('library', library); }
   if (data.history) { history = merge ? [...data.history, ...history].slice(0, 60) : data.history; write('history', history); }
   if (data.marks) {

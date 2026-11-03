@@ -49,6 +49,7 @@ export default async function search(ctx) {
     <select class="select" data-f="origin" aria-label="Type">${opts(M_ORIGIN, q.origin)}</select>
     <select class="select" data-f="demo" aria-label="Demographic">${opts(M_DEMO, q.demo)}</select>
     <select class="select" data-f="status" aria-label="Status">${opts(M_STATUS, q.status)}</select>
+    ${getSettings().adultManga === true ? html`<select class="select" data-f="rating" aria-label="Content rating">${opts([['', 'All enabled ratings'], ['adult', '18+ only']], q.rating)}</select>` : ''}
     <select class="select" data-f="sort" aria-label="Sort">${opts(M_SORT, q.sort)}</select>`;
 
   const activeTag = q.tag && type === 'manga' ? tags.find((t) => t.id === q.tag)?.name : q.tag;
@@ -81,7 +82,7 @@ export default async function search(ctx) {
       page += 1; return { items: r.items.map(fromAnime), hasNext: r.hasNext, total: r.total };
     }
     const order = MD_ORDER[q.sort] || (text ? MD_ORDER.relevance : MD_ORDER.popular);
-    const r = await listManga({ q: text, order, offset, limit: 30, lang: getSettings().mangaLang, tags: q.tag ? [q.tag] : [], origin: q.origin ? (q.origin === 'zh' ? ['zh', 'zh-hk'] : [q.origin]) : undefined, status: q.status, demographic: q.demo });
+    const r = await listManga({ q: text, order, offset, limit: 30, lang: getSettings().mangaLang, tags: q.tag ? [q.tag] : [], origin: q.origin ? (q.origin === 'zh' ? ['zh', 'zh-hk'] : [q.origin]) : undefined, status: q.status, demographic: q.demo, adultOnly: q.rating === 'adult' });
     offset += r.items.length; return { items: r.items.map(fromManga), hasNext: r.hasNext, total: r.total };
   };
   const load = async (first) => {

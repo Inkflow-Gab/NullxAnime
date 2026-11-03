@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
-import { baseUrl, instantEmbed, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
+import { baseUrl, instantEmbed, aniweebEmbed, extraEmbed, animeggSearch, animeggEpisodes, animeggWatch, senshiWatch, anipubSearch, anipubPlayer } from '../js/api/community.js';
 
 assert.equal(instantEmbed(154587, 2), 'https://megaplay.buzz/stream/ani/154587/2/sub');
 assert.equal(instantEmbed('154587', 2, 'dub'), 'https://megaplay.buzz/stream/ani/154587/2/dub');
 for (const args of [['../1', 1], [0, 1], [1, -1], [1, 1, 'raw'], [1, 1.5]]) assert.throws(() => instantEmbed(...args));
+assert.equal(aniweebEmbed(154587, 2, 'dub', 2), 'https://api.aniweeb.net/embed/ani/154587/2?track=dub&server=2');
+for (const args of [['../1', 1], [0, 1], [1, -1], [1, 1, 'raw'], [1, 1, 'sub', 3]]) assert.throws(() => aniweebEmbed(...args));
+assert.equal(extraEmbed('supaplay', 154587, 2, 'sub'), 'https://supaplay.fun/stream/ani/154587/2/sub');
+assert.equal(extraEmbed('aniembed', 154587, 2, 'dub'), 'https://aniembed.se/e/154587/2?lang=dub');
+assert.equal(extraEmbed('nexus', 154587, 2, 'sub'), 'https://www.moviesnexus.fun/anime/154587/2/sub');
+for (const args of [['other', 1, 1], ['supaplay', '../1', 1], ['nexus', 1, -1], ['aniembed', 1, 1, 'raw']]) assert.throws(() => extraEmbed(...args));
 assert.equal(baseUrl('https://example.org/root/'), 'https://example.org/root');
 for (const bad of ['http://example.org', 'https://a:b@example.org', 'javascript:alert(1)', 'https://example.org/?secret=x']) assert.throws(() => baseUrl(bad));
 assert.throws(() => senshiWatch('https://example.org', '../private', 1, 'sub'));

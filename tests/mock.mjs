@@ -79,6 +79,10 @@ export function anilist(body) {
     } };
   }
   if (query.includes('GenreCollection')) return { data: { GenreCollection: GENRES.concat(['Hentai']) } };
+  if (query.includes('RecentEpisodes')) {
+    const p = variables.page;
+    return { data: { Page: { pageInfo: { hasNextPage: p < 2 }, airingSchedules: many(6, p === 1 ? 0 : 6).map((m, k) => ({ airingAt: variables.to - 3600 * (k + 1 + (p - 1) * 6), episode: 1 + k, media: m })) } } };
+  }
   if (query.includes('airingSchedules')) {
     const f = variables.from;
     return { data: { Page: { pageInfo: { hasNextPage: false }, airingSchedules: many(9, 3).map((m, k) => ({ airingAt: f + 3600 * (3 + k * 2), episode: 5 + k, timeUntilAiring: 3600 * (3 + k * 2) - 100, media: { ...m, countryOfOrigin: 'JP' } })) } } };
@@ -102,7 +106,7 @@ function mdManga(i) {
   const [t, lang] = MANGA[i % MANGA.length];
   return {
     id: mid(i), type: 'manga',
-    attributes: { title: { en: t }, altTitles: [{ ja: 'テスト' }], description: { en: `The story of ${t}.\n\nA gripping tale with *incredible* art.\n\n---\n**Links:**\n- [Official](https://example.com)` }, status: i % 2 ? 'ongoing' : 'completed', year: 2015 + i % 8, contentRating: 'safe', originalLanguage: lang, lastChapter: '120', publicationDemographic: 'shounen', availableTranslatedLanguages: ['en', 'es', 'pt-br'], links: { al: '30002', mal: '2', mu: 'abc123', engtl: 'https://www.viz.com/one-piece' }, tags: [{ id: 't1', attributes: { name: { en: 'Action' }, group: 'genre' } }, { id: 't2', attributes: { name: { en: 'Fantasy' }, group: 'genre' } }, { id: 't3', attributes: { name: { en: 'Isekai' }, group: 'theme' } }] },
+    attributes: { title: { en: t }, altTitles: [{ ja: 'テスト' }], description: { en: `The story of ${t}.\n\nA gripping tale with *incredible* art.\n\n---\n**Links:**\n- [Official](https://example.com)` }, status: i % 2 ? 'ongoing' : 'completed', year: 2015 + i % 8, contentRating: i === 9 ? 'erotica' : 'safe', originalLanguage: lang, lastChapter: '120', publicationDemographic: 'shounen', availableTranslatedLanguages: ['en', 'es', 'pt-br'], links: { al: '30002', mal: '2', mu: 'abc123', engtl: 'https://www.viz.com/one-piece' }, tags: [{ id: 't1', attributes: { name: { en: 'Action' }, group: 'genre' } }, { id: 't2', attributes: { name: { en: 'Fantasy' }, group: 'genre' } }, { id: 't3', attributes: { name: { en: 'Isekai' }, group: 'theme' } }] },
     relationships: [{ type: 'cover_art', attributes: { fileName: `cover${i}.jpg?l=${encodeURIComponent(t)}` } }, { type: 'author', attributes: { name: 'Mock Author' } }, { type: 'artist', attributes: { name: 'Mock Artist' } }],
   };
 }
@@ -111,7 +115,7 @@ export function mangadex(url) {
   const p = u.pathname;
   if (p === '/manga/tag') return { data: ['Action', 'Fantasy', 'Isekai', 'Romance'].map((n, k) => ({ id: `t${k + 1}`, attributes: { name: { en: n }, group: k === 2 ? 'theme' : 'genre' } })) };
   if (p === '/manga/random') return { data: mdManga(2) };
-  if (p === '/manga') { const data = Array.from({ length: 12 }, (_, k) => mdManga(k)); return { data, total: 40, offset: Number(u.searchParams.get('offset')) || 0 }; }
+  if (p === '/manga') { const ratings = u.searchParams.getAll('contentRating[]'); const data = Array.from({ length: 12 }, (_, k) => mdManga(k)).filter((m) => ratings.includes(m.attributes.contentRating)); return { data, total: ratings.includes('safe') ? 40 : data.length, offset: Number(u.searchParams.get('offset')) || 0 }; }
   let m;
   if ((m = p.match(/^\/statistics\/manga\/(.+)$/))) return { statistics: { [m[1]]: { rating: { bayesian: 8.74 }, follows: 123456 } } };
   if ((m = p.match(/^\/manga\/([^/]+)\/feed$/))) {
