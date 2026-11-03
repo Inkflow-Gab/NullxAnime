@@ -38,6 +38,8 @@ const json = (obj) => ({ status: 200, contentType: 'application/json', headers: 
 let mockProviderEndpoints = false;
 let mockNextRelease = false;
 let blockMangaDex = false;
+let blockAllManga = false;
+let blockSampleImage = false;
 let blockReaderImages = false;
 const networkRequests = [];
 const releaseQueries = [];
@@ -67,6 +69,7 @@ async function mockNetwork(page) {
     if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><iframe src="https://anipub.test/video-embed"></iframe></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname === '/video-embed') return req.respond({ status: 200, contentType: 'text/html', body: 'Episode player mock' });
     if (u.hostname === 'graphql.anilist.co') { const body = req.postData() || '{}'; if (body.includes('RecentEpisodes')) releaseQueries.push(JSON.parse(body)); return req.respond(json(anilist(body))); }
+    if (blockAllManga && ['api.asurascans.com', 'api.vortexscans.org', 'api.mangadex.org'].includes(u.hostname)) return req.respond({ status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' });
     if (u.hostname === 'api.asurascans.com') {
       const comic = { slug: 'mock-series', title: 'Mock Asura Manhwa', type: 'manhwa', status: 'ongoing', cover: 'https://cdn.asurascans.com/asura-images/covers/mock.webp', description: '<p>A mock series.</p>', chapter_count: 2 };
       const chapters = [{ number: 2, is_premium: true, page_count: 2 }, { number: 1, is_premium: false, page_count: 3 }];
@@ -95,6 +98,7 @@ async function mockNetwork(page) {
       if (u.pathname === '/chapter/mock-omega/chapter-1') return req.respond(json({ chapter: { series_id: 758, chapter_slug: 'chapter-1', price: 0, chapter_data: { images: ['https://media.omegascans.org/file/1.webp', 'https://evil.example/2.webp'] } } }));
       return req.respond({ status: 404, body: '' });
     }
+    if (blockSampleImage && u.hostname === 'cdn.asurascans.com' && u.pathname.includes('martial-god-regressed')) return req.abort();
     if (blockReaderImages && u.hostname === 'uploads.mangadex.org' && u.pathname.startsWith('/data/')) return req.abort();
     if (u.hostname === 'api.mangadex.org') return req.respond(blockMangaDex ? { status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' } : json(mangadex(url)));
     if (u.hostname === 'archive.org' && !u.pathname.startsWith('/download') && !u.pathname.startsWith('/services')) return req.respond(json(archive(url)));
@@ -139,8 +143,8 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('reliable update') &&
-        dialog.textContent.includes('older and newer files') && document.activeElement === button && bg.startsWith('rgba(35, 18, 59,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Manga browsing') &&
+        dialog.textContent.includes('connection') && document.activeElement === button && bg.startsWith('rgba(35, 18, 59,');
     });
   })());
   check('release stays visible until acknowledged, then stays dismissed', await (async () => {
@@ -388,6 +392,48 @@ try {
     blockMangaDex = false;
     return shown && sources.length > 0 && message && href === '#/asura/mock-series' && fallbackLink === '#/asura?q=mock';
   })());
+  check('manga Popular and Latest use provider sorts and keep the search', await (async () => {
+    await page.evaluate(() => sessionStorage.clear());
+    await visit('/manga', '#comic-grid');
+    if (!(await page.$('#comic-sort a.on[aria-current="page"]'))) return false;
+    const requestStart = networkRequests.length;
+    await page.click('#comic-sort a[href*="popular"]');
+    await page.waitForFunction(() => location.hash.includes('sort=popular') && document.querySelector('#comic-sort .on')?.textContent === 'Popular' && !!document.querySelector('#comic-grid') && !document.querySelector('#comic-status').textContent.includes('Checking'));
+    const requests = networkRequests.slice(requestStart).map((url) => new URL(url));
+    const order = await page.$$eval('#comic-grid .poster', (links) => links.slice(0, 3).map((link) => link.getAttribute('href').split('/')[2]));
+    const mixedSources = order.join(',') === 'asura,vortex,mangadex';
+    const correctSorts = requests.some((u) => u.hostname === 'api.asurascans.com' && u.searchParams.get('sort') === 'popular') &&
+      requests.some((u) => u.hostname === 'api.vortexscans.org' && u.searchParams.get('orderBy') === 'totalViews') &&
+      requests.some((u) => u.hostname === 'api.mangadex.org' && u.searchParams.get('order[followedCount]') === 'desc');
+    await page.type('#comic-query', 'Mock');
+    await page.click('#comic-search button');
+    await page.waitForFunction(() => location.hash.includes('q=Mock') && document.querySelector('#comic-discovery h2')?.textContent.includes('Mock') && !!document.querySelector('#comic-grid') && !document.querySelector('#comic-status').textContent.includes('Checking'));
+    const keptPopular = await page.evaluate(() => location.hash.includes('sort=popular'));
+    const latestStart = networkRequests.length;
+    await page.click('#comic-sort a:not(.on)');
+    await page.waitForFunction(() => location.hash.includes('q=Mock') && !location.hash.includes('sort=popular') && document.querySelector('#comic-sort .on')?.textContent === 'Latest' && !!document.querySelector('#comic-grid') && !document.querySelector('#comic-status').textContent.includes('Checking'));
+    const latestRequests = networkRequests.slice(latestStart).map((url) => new URL(url));
+    return mixedSources && correctSorts && keptPopular && latestRequests.some((u) => u.hostname === 'api.asurascans.com' && u.searchParams.get('sort') === 'latest') &&
+      latestRequests.some((u) => u.hostname === 'api.vortexscans.org' && u.searchParams.get('orderBy') === 'latestChapter') &&
+      latestRequests.some((u) => u.hostname === 'api.mangadex.org' && u.searchParams.get('order[latestUploadedChapter]') === 'desc');
+  })());
+
+  check('manga connection check distinguishes blocked catalogues and sample images', await (async () => {
+    blockAllManga = true;
+    blockSampleImage = true;
+    await page.evaluate(() => sessionStorage.clear());
+    await visit('/manga?q=connectiontest', '#comic-check');
+    await page.waitForFunction(() => document.querySelector('#comic-status')?.textContent.includes('Asura, Vortex, MangaDex'));
+    const failure = await page.$('[data-action="retry"]');
+    await page.click('.comic-diagnostic summary');
+    await page.click('#comic-check');
+    await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length === 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'));
+    const lines = await page.$$eval('#comic-check-results li', (items) => items.map((it) => it.textContent));
+    blockAllManga = false;
+    blockSampleImage = false;
+    return !!failure && lines.slice(0, 3).every((line) => line.includes('HTTP 403')) && lines[3].includes('Could not load') && lines[4].includes('Loaded') && await page.$eval('#comic-check', (button) => !button.disabled);
+  })());
+
   check('unified manga discovery survives MangaDex 403 and searches providers after opening a title', await (async () => {
     blockMangaDex = true;
     await page.evaluate(() => sessionStorage.clear());
@@ -617,6 +663,13 @@ try {
   })());
   check('small phone home stays within viewport', await visit('/', '.hero-slide.active') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   check('small phone watch page stays within viewport', await visit('/watch/1000/1', '#stage') && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  check('small phone manga sorting and connection check fit the screen', await (async () => {
+    await visit('/manga?q=Mock', '#comic-grid');
+    await page.click('.comic-diagnostic summary');
+    await page.click('#comic-check');
+    await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length === 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'));
+    return await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && !!document.querySelector('#comic-sort a.on') && !document.querySelector('#comic-check').disabled);
+  })());
   check('small phone scan reader stays within viewport', await visit('/scans/vortex/mock-iken/1', '.reader .rpage', { timeout: 10000 }) && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   check('no uncaught JS / console errors', errors.length === 0, `\n    ${errors.slice(0, 6).join('\n    ')}`);
