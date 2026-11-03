@@ -10,7 +10,7 @@ A sleek, fast **anime + manga** hub. No account required and no ads added by Nul
 
 | Area | What you get |
 | --- | --- |
-| **Anime** | Hero carousel, a **Top 10 ranking** right under it (trending / most popular / top rated / this season), **Recently updated** (episodes that just aired, linking straight to the episode), **New releases**, **Airing soon** and **Upcoming anime with premiere dates**, plus airing / seasonal / top-rated rails, full search + filters (genre, format, status, season, year, sort), detail pages with episodes, characters, relations, recommendations, tags, staff. Data: [AniList](https://anilist.co). |
+| **Anime** | Hero carousel, a **Top 10 ranking** right under it (trending / most popular / top rated / this season), **New releases** (episodes that just aired, linking straight to the episode), **New series**, **Airing soon** and **Upcoming anime with premiere dates**, plus airing / seasonal / top-rated rails, full search + filters (genre, format, status, season, year, sort), detail pages with episodes, characters, relations, recommendations, tags, staff. Data: [AniList](https://anilist.co). |
 | **Watch** | No-setup Instant play, Aniweeb, SupaPlay, AniEmbed and Movies Nexus episode-player embeds, with audio and server choices. The public-domain / CC [Internet Archive](https://archive.org) library is also available. Providers control playback, ads and availability. |
 | **Manga** | MangaDex search and reader plus separate Asura, Vortex, Hivetoons and Omega Scans catalogues and vertical readers. MangaDex manga, manhwa and manhua include safe/suggestive ratings by default; adult-rated titles require local 18+ opt-in. Omega is an 18+ source and is hidden until opt-in; source catalogues are separate from MangaDex. |
 | **Tracker** | One list for anime + manga: status, progress, score, history, stats, JSON backup/restore, MyAnimeList/AniList XML export. Lives in `localStorage`. |
@@ -61,7 +61,7 @@ tests/                static server, API mocks, e2e
 
 ### Device and player notes
 
-The layout adapts to the viewport and touch input. Recognizable TV user agents enable remote navigation automatically; Settings can override TV mode. Detection is local and best-effort, not a guarantee for every device. The watch page includes episode filtering, retry, and share-link controls. The Recent episodes page paginates AniList airing events from the last 30 days; an aired episode may not yet be available at a provider.
+The layout adapts to the viewport and touch input. Recognizable TV user agents enable remote navigation automatically; Settings can override TV mode. Detection is local and best-effort, not a guarantee for every device. The watch page includes episode filtering, retry, and share-link controls. The Recent episodes page browses AniList airing events newest first with automatic and manual pagination (up to 500 pages); an aired episode may not yet be available at a provider. MangaDex can deny requests in some browsers or regions: the manga home keeps other sources accessible and offers an Asura fallback, but cannot unblock MangaDex itself.
 
 The optional Senshi tab retrieves available Senshi/StreamNin/FileMoon mirrors from the updated separately deployed worker using the title's MyAnimeList ID. Availability, embedding, audio, ads and permissions depend on each external provider; no provider backend is hosted by GitHub Pages. See [provider notes](docs/PROVIDERS.md) for what is and is not implemented.
 

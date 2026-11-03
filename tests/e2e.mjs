@@ -36,7 +36,10 @@ async function launch() {
 const json = (obj) => ({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(obj) });
 
 let mockProviderEndpoints = false;
+let blockMangaDex = false;
+let blockReaderImages = false;
 const networkRequests = [];
+const releaseQueries = [];
 async function mockNetwork(page) {
   await page.setRequestInterception(true);
   page.on('request', (req) => {
@@ -61,7 +64,7 @@ async function mockNetwork(page) {
     if (u.hostname === 'anipub.test' && u.pathname === '/AniPlayer/42/1') return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><video><source src="/videos/episode.mp4"></video></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><iframe src="https://anipub.test/video-embed"></iframe></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname === '/video-embed') return req.respond({ status: 200, contentType: 'text/html', body: 'Episode player mock' });
-    if (u.hostname === 'graphql.anilist.co') return req.respond(json(anilist(req.postData() || '{}')));
+    if (u.hostname === 'graphql.anilist.co') { const body = req.postData() || '{}'; if (body.includes('RecentEpisodes')) releaseQueries.push(JSON.parse(body)); return req.respond(json(anilist(body))); }
     if (u.hostname === 'api.asurascans.com') {
       const comic = { slug: 'mock-series', title: 'Mock Asura Manhwa', type: 'manhwa', status: 'ongoing', cover: 'https://cdn.asurascans.com/asura-images/covers/mock.webp', description: '<p>A mock series.</p>', chapter_count: 2 };
       const chapters = [{ number: 2, is_premium: true, page_count: 2 }, { number: 1, is_premium: false, page_count: 3 }];
@@ -90,7 +93,8 @@ async function mockNetwork(page) {
       if (u.pathname === '/chapter/mock-omega/chapter-1') return req.respond(json({ chapter: { series_id: 758, chapter_slug: 'chapter-1', price: 0, chapter_data: { images: ['https://media.omegascans.org/file/1.webp', 'https://evil.example/2.webp'] } } }));
       return req.respond({ status: 404, body: '' });
     }
-    if (u.hostname === 'api.mangadex.org') return req.respond(json(mangadex(url)));
+    if (blockReaderImages && u.hostname === 'uploads.mangadex.org' && u.pathname.startsWith('/data/')) return req.abort();
+    if (u.hostname === 'api.mangadex.org') return req.respond(blockMangaDex ? { status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' } : json(mangadex(url)));
     if (u.hostname === 'archive.org' && !u.pathname.startsWith('/download') && !u.pathname.startsWith('/services')) return req.respond(json(archive(url)));
     if (/\.(jpg|jpeg|png|webp)(\?|$)|services\/img|\/uploads\.mangadex/i.test(url) || /anilist|mangadex|archive\.org\/services/.test(u.hostname + u.pathname)) {
       return req.respond({ status: 200, contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' }, body: imageFor(url) });
@@ -280,17 +284,37 @@ try {
   check('mark watched updates tracker', await (async () => { await visit('/watch/1000/2', '#markbtn'); await page.click('#markbtn'); await new Promise((r) => setTimeout(r, 300)); const s = JSON.parse(await page.evaluate(() => localStorage.getItem('nx:marks'))); return s['anime:1000']?.includes(2); })());
   check('search page', await visit('/search?type=anime&q=frieren', '.grid .card', { shot: 'search' }));
   check('browse by genre', await visit('/search?type=anime&genre=Action', '.grid .card'));
+  check('search previews matching anime while typing', await (async () => {
+    await visit('/search?type=anime', '#sform input');
+    await page.type('#sform input', 'frieren');
+    await page.waitForSelector('#search-suggestions a.pal-item', { visible: true, timeout: 8000 });
+    const preview = await page.$eval('#search-suggestions a.pal-item', (a) => ({ text: a.textContent, href: a.getAttribute('href'), img: !!a.querySelector('img') }));
+    await page.$eval('#sform input', (e) => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    return /frieren/i.test(preview.text) && preview.href === '#/anime/1000' && preview.img && await page.$eval('#search-suggestions', (e) => e.hidden);
+  })());
   check('recent episodes are paginated and link to the episode', await (async () => {
     if (!(await visit('/releases', '#release-grid .card'))) return false;
-    const first = await count('#release-grid .card');
     const href = await page.$eval('#release-grid .poster', (e) => e.getAttribute('href'));
-    await page.$eval('#release-load', (e) => e.click());
-    await page.waitForFunction((n) => document.querySelectorAll('#release-grid .card').length > n, {}, first);
-    return first === 6 && href === '#/watch/1000/1' && await count('#release-grid .card') === 12 && await page.$eval('#release-more', (e) => e.hidden);
+    const banner = await page.$eval('#release-grid .poster img', (e) => e.src.includes('/banner/'));
+    if (await count('#release-grid .card') < 12) await page.$eval('#release-load', (e) => e.click());
+    await page.waitForFunction(() => document.querySelectorAll('#release-grid .card').length === 12);
+    return href === '#/watch/1000/1' && banner && releaseQueries.some((r) => r.variables.from === 0 && r.query.includes('sort: TIME_DESC')) && await page.$eval('#release-more', (e) => e.hidden);
   })());
   check('schedule', await visit('/schedule', '.sched-row', { shot: 'schedule' }));
 
   console.log('Manga');
+  check('manga remains usable when MangaDex returns 403', await (async () => {
+    blockMangaDex = true;
+    await page.evaluate(() => sessionStorage.clear());
+    const shown = await visit('/manga', '#asura-fallback .card', { timeout: 12000 });
+    const sources = await page.$$('a[href="#/scans/vortex"]');
+    const message = (await page.$eval('#manga-loading', (el) => el.textContent)).includes('MangaDex is unavailable');
+    const href = await page.$eval('#asura-fallback .poster', (a) => a.getAttribute('href'));
+    await visit('/search?type=manga&q=mock', '#results .empty', { timeout: 12000 });
+    const fallbackLink = await page.$eval('#results a[href^="#/asura"]', (a) => a.getAttribute('href'));
+    blockMangaDex = false;
+    return shown && sources.length > 0 && message && href === '#/asura/mock-series' && fallbackLink === '#/asura?q=mock';
+  })());
   check('manga home', await visit('/manga', '.mhero-slide.active', { shot: 'manga' }) && (await count('.rail .card')) > 30);
   check('manga carousel loads other slides on demand', await (async () => {
     const before = await page.$$eval('.mhero-slide:not(.active) img[data-hero-src]', (imgs) => imgs.length);
@@ -342,6 +366,16 @@ try {
   })());
   check('manga search (type filter)', await visit('/search?type=manga&origin=ko', '.grid .card'));
   check('reader (vertical)', await visit('/read/00000000-0000-4000-8000-000000000000/11111111-0000-4000-8000-000000000005', '.reader .rwrap', { shot: 'reader' }) && (await count('.rwrap')) === 8);
+  check('failed reader pages keep the original URL and retry', await (async () => {
+    blockReaderImages = true;
+    await visit('/read/00000000-0000-4000-8000-000000000000/11111111-0000-4000-8000-000000000006', '.reader .rpage');
+    await page.waitForSelector('.reader img.rpage.failed', { timeout: 10000 });
+    const src = await page.$eval('.reader img.rpage.failed', (img) => img.src);
+    blockReaderImages = false;
+    await page.$eval('.reader img.rpage.failed', (img) => img.click());
+    await page.waitForFunction(() => { const img = document.querySelector('.reader img.rpage'); return img && img.complete && img.naturalWidth > 0; }, { timeout: 10000 });
+    return src.startsWith('https://uploads.mangadex.org/data/') && !src.includes('cover-placeholder');
+  })());
   await page.evaluate(() => localStorage.setItem('nx:settings', JSON.stringify({ readerMode: 'rtl' })));
   check('reader (paged RTL) + keyboard', await (async () => {
     await visit('/read/00000000-0000-4000-8000-000000000000/11111111-0000-4000-8000-000000000005', '.paged-wrap');
@@ -471,6 +505,10 @@ try {
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   check('mobile home + tab bar', await visit('/', '.hero-slide.active', { shot: 'mobile-home' }) && (await page.$eval('.tabbar', (e) => getComputedStyle(e).display)) === 'flex');
   check('mobile device hint is automatic', await page.$eval('html', (e) => e.dataset.device === 'phone'));
+  check('mobile release blocks have two columns and visible titles', await (async () => {
+    await visit('/releases', '#release-grid .card');
+    return await page.$eval('#release-grid', (grid) => { const a = grid.querySelectorAll('.card'); return a.length >= 2 && a[0].getBoundingClientRect().top === a[1].getBoundingClientRect().top && !!a[0].querySelector('.title').textContent && document.documentElement.scrollWidth <= window.innerWidth + 1; });
+  })());
   check('mobile detail', await visit('/anime/1002', '.detail-title', { shot: 'mobile-anime' }));
   check('no horizontal overflow on mobile', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });

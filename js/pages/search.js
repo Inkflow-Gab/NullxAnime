@@ -1,10 +1,10 @@
 // Unified search & browse page for anime (AniList) and manga (MangaDex).
 
-import { html, render, $, $$, on, hashQuery, currentSeason, titleCase } from '../util.js';
+import { html, render, $, $$, on, hashQuery, currentSeason, titleCase, debounce } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { searchMedia, genreList } from '../api/anilist.js';
 import { listManga, tagList } from '../api/mangadex.js';
-import { card, fromAnime, fromManga, skelGrid, errorBox, emptyBox } from '../ui/components.js';
+import { card, fromAnime, fromManga, skelGrid, errorBox, emptyBox, PLACEHOLDER } from '../ui/components.js';
 import { pushSearch, getSettings } from '../store.js';
 import { go } from '../router.js';
 
@@ -61,7 +61,7 @@ export default async function search(ctx) {
         <a class="${type === 'manga' ? 'on' : ''}" href="#${mk({ type: 'manga', genre: '', tag: '', format: '', status: '', season: '', year: '', sort: '', origin: '', demo: '' })}">${icon('book')} Manga</a></div>
     </div>
     <form class="filter-bar" id="sform">
-      <div class="filter-search">${icon('search')}<input class="input" name="q" value="${text}" placeholder="Search ${type}…" aria-label="Search text"></div>
+      <div class="filter-search">${icon('search')}<input class="input" name="q" value="${text}" placeholder="Search ${type}…" aria-label="Search text" autocomplete="off" aria-controls="search-suggestions" aria-expanded="false"><div id="search-suggestions" class="search-suggestions" aria-live="polite" hidden></div></div>
       ${filters}
       <button class="btn primary">Search</button>
       ${(text || q.genre || q.tag || q.format || q.status || q.season || q.year || q.sort || q.origin || q.demo) ? html`<a class="btn ghost" href="#/search?type=${type}">Clear</a>` : ''}
@@ -70,6 +70,31 @@ export default async function search(ctx) {
     <div id="results"></div>
     <div class="load-more" id="more" hidden><button class="btn lg" id="morebtn">Load more</button></div>
   </div>`);
+
+  const input = $('#sform input[name="q"]', ctx.el), suggestions = $('#search-suggestions', ctx.el);
+  let suggestionSeq = 0;
+  const hideSuggestions = () => { suggestions.hidden = true; input.setAttribute('aria-expanded', 'false'); };
+  const suggest = debounce(async (term, seq) => {
+    try {
+      const items = type === 'anime'
+        ? (await searchMedia({ q: term, perPage: 7 })).items.map(fromAnime)
+        : (await listManga({ q: term, limit: 7, order: { relevance: 'desc' }, lang: getSettings().mangaLang })).items.map(fromManga);
+      if (!ctx.alive() || seq !== suggestionSeq) return;
+      render(suggestions, items.length ? html`${items.map((item) => html`<a class="pal-item" href="${item.href}"><img src="${item.cover || PLACEHOLDER}" alt="" referrerpolicy="no-referrer"><span><span class="t">${item.title}</span><span class="s">${item.sub}</span></span></a>`)}<button type="submit" class="suggest-all">See all results for “${term}”</button>` : html`<p class="suggest-message">No matching ${type} found. Press Search for full results.</p>`);
+    } catch {
+      if (!ctx.alive() || seq !== suggestionSeq) return;
+      render(suggestions, type === 'manga' ? html`<p class="suggest-message">MangaDex unavailable. <a href="#/asura?q=${encodeURIComponent(term)}">Search Asura instead</a>.</p>` : html`<p class="suggest-message">Suggestions unavailable. Press Search to try again.</p>`);
+    }
+    suggestions.hidden = false; input.setAttribute('aria-expanded', 'true');
+  }, 300);
+  input.addEventListener('input', () => {
+    const seq = ++suggestionSeq, term = input.value.trim();
+    suggest.cancel(); hideSuggestions();
+    if (term.length >= 2) suggest(term, seq);
+  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { ++suggestionSeq; suggest.cancel(); hideSuggestions(); } });
+  ctx.el.addEventListener('focusout', (e) => { if (e.target.closest('.filter-search') && !e.currentTarget.querySelector('.filter-search').contains(e.relatedTarget)) { ++suggestionSeq; suggest.cancel(); hideSuggestions(); } });
+  ctx.cleanup(() => { ++suggestionSeq; suggest.cancel(); });
 
   $('#sform').addEventListener('submit', (e) => { e.preventDefault(); go(mk({ q: new FormData(e.target).get('q') })); });
   on(ctx.el, 'change', '[data-f]', (e, t) => go(mk({ [t.dataset.f]: t.value })));
@@ -97,7 +122,7 @@ export default async function search(ctx) {
         render(results, html`<div class="muted" style="margin:0 0 14px">${total ? `${total.toLocaleString()} results` : ''}</div><div class="grid" id="grid">${r.items.map((i) => card(i))}</div>`);
       } else $('#grid').insertAdjacentHTML('beforeend', r.items.map((i) => card(i)).join(''));
       more.hidden = !r.hasNext;
-    } catch (e) { if (ctx.alive()) { if (first) render(results, errorBox(e)); else morebtn.textContent = 'Retry'; } }
+    } catch (e) { if (ctx.alive()) { if (first) render(results, type === 'manga' ? html`${errorBox(e, { title: 'MangaDex is unavailable' })}<div class="row" style="justify-content:center"><a class="btn" href="#/asura?q=${encodeURIComponent(text)}">Search Asura instead</a><a class="btn" href="#/manga">Other manga sources</a></div>` : errorBox(e)); else morebtn.textContent = 'Retry'; } }
     morebtn.disabled = false;
   };
   morebtn.addEventListener('click', () => { morebtn.textContent = 'Load more'; load(false); });

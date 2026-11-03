@@ -45,7 +45,7 @@ export default async function home(ctx) {
 
 function quickLinks() {
   const tiles = [
-    ['flame', 'Recent episodes', 'Browse the last 30 days', '#/releases'],
+    ['flame', 'Recent episodes', 'Browse newest to oldest', '#/releases'],
     ['calendar', 'Airing schedule', 'Never miss an episode', '#/schedule'],
     ['library', 'My list', 'Track what you watch', '#/library'],
     ['film', 'Free & open library', 'Legal, public-domain video', '#/free'],
@@ -157,8 +157,8 @@ async function loadUpdates(ctx) {
   const premiere = (m) => (m.startDate?.year ? `Premieres ${fmtFuzzyDate(m.startDate)}` : 'Date to be announced');
   const daysTo = (m) => { const d = m.startDate; if (!d?.year || !d.month || !d.day) return null; const n = Math.ceil((new Date(d.year, d.month - 1, d.day) - Date.now()) / 86400000); return n >= 0 ? n : null; };
   render(box, html`
-    ${rail({ title: 'Recently updated', sub: 'Recently aired episodes — provider availability varies', href: '#/releases', items: u.recent.map((x) => epCard(x, (y) => `EP ${y.episode} · ${timeAgo(y.airingAt * 1000)}`)), id: 'recent' })}
-    ${rail({ title: 'New releases', sub: 'Series that premiered in the last 6 weeks', href: '#/search?type=anime&status=RELEASING&sort=START_DATE_DESC', items: u.fresh.map((m) => { const it = fromAnime(m); return card(it, { badge: 'NEW', sub: `Premiered ${fmtFuzzyDate(m.startDate)}` }); }) })}
+    ${rail({ title: 'New releases', sub: 'Recently aired episodes — provider availability varies', href: '#/releases', items: u.recent.map((x) => epCard(x, (y) => `EP ${y.episode} · ${timeAgo(y.airingAt * 1000)}`)), id: 'recent' })}
+    ${rail({ title: 'New series', sub: 'Series that premiered in the last 6 weeks', href: '#/search?type=anime&status=RELEASING&sort=START_DATE_DESC', items: u.fresh.map((m) => { const it = fromAnime(m); return card(it, { badge: 'NEW', sub: `Premiered ${fmtFuzzyDate(m.startDate)}` }); }) })}
     ${rail({ title: 'Airing soon', sub: 'Next episodes in the coming 3 days (your local time)', href: '#/schedule', items: u.soon.map((x) => epCard(x, (y) => `EP ${y.episode} · in ${fmtCountdown(y.airingAt - now)}`, true)) })}
     ${rail({ title: 'Upcoming anime', sub: 'Most anticipated, soonest first', href: '#/search?type=anime&status=NOT_YET_RELEASED&sort=START_DATE', items: u.upcoming.map((m) => { const it = fromAnime(m); const n = daysTo(m); return card(it, { badge: n != null ? (n === 0 ? 'Premieres today' : `In ${n} day${n === 1 ? '' : 's'}`) : 'Upcoming', sub: premiere(m) }); }) })}`);
 }

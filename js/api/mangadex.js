@@ -95,7 +95,7 @@ export function listManga({ q, order = { followedCount: 'desc' }, offset = 0, li
 }
 
 export async function mangaHome(lang = 'en') {
-  const [popular, latest, top, manhwa, manhua, fresh] = await Promise.all([
+  const results = await Promise.allSettled([
     listManga({ lang, order: { followedCount: 'desc' }, limit: 20 }),
     listManga({ lang, order: { latestUploadedChapter: 'desc' }, limit: 20 }),
     listManga({ lang, order: { rating: 'desc' }, limit: 20 }),
@@ -103,7 +103,9 @@ export async function mangaHome(lang = 'en') {
     listManga({ lang, order: { followedCount: 'desc' }, origin: ['zh', 'zh-hk'], limit: 20 }),
     listManga({ lang, order: { createdAt: 'desc' }, limit: 20 }),
   ]);
-  return { popular: popular.items, latest: latest.items, top: top.items, manhwa: manhwa.items, manhua: manhua.items, fresh: fresh.items };
+  if (results.every((r) => r.status === 'rejected')) throw results[0].reason;
+  const [popular, latest, top, manhwa, manhua, fresh] = results.map((r) => r.status === 'fulfilled' ? r.value.items : []);
+  return { popular, latest, top, manhwa, manhua, fresh };
 }
 
 export function mangaDetail(id) {

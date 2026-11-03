@@ -3,16 +3,30 @@
 import { html, render, $, $$, mdPlain, titleCase } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { mangaHome, tagList, randomManga } from '../api/mangadex.js';
-import { card, rail, fromManga, continueCard, skelRail, errorBox, toast } from '../ui/components.js';
+import { card, rail, fromManga, continueCard, skelRail, toast, PLACEHOLDER } from '../ui/components.js';
 import { getHistory, getSettings } from '../store.js';
 import { go } from '../router.js';
+import { asuraSearch } from '../api/asura.js';
 
 export default async function mangaHomePage(ctx) {
   ctx.setTitle('Manga');
   const lang = getSettings().mangaLang;
-  ctx.render(html`<div class="container page"><div class="skel" style="height:340px;border-radius:22px"></div>${skelRail()}${skelRail()}</div>`);
+  // Keep independent catalogues reachable even when MangaDex blocks this browser.
+  ctx.render(html`<div class="container page"><h1 class="page-title">Manga &amp; comics</h1>${sourceTiles()}<div id="manga-loading">${skelRail()}</div></div>`);
   let feed;
-  try { feed = await mangaHome(lang); } catch (e) { ctx.render(html`<div class="container page">${errorBox(e)}</div>`); return; }
+  try { feed = await mangaHome(lang); } catch {
+    if (!ctx.alive()) return;
+    $('#random', ctx.el)?.remove();
+    const box = $('#manga-loading', ctx.el);
+    render(box, html`<section class="section"><h2>MangaDex is unavailable</h2><p class="muted">MangaDex may block access in your browser or region. Try another source above; MangaDex titles and chapters may remain unavailable.</p><button class="btn" data-action="retry">Try MangaDex again</button><div id="asura-fallback">${skelRail(6)}</div></section>`);
+    try {
+      const result = await asuraSearch();
+      if (!ctx.alive()) return;
+      const cards = result.items.map((it) => html`<article class="card"><a class="poster" href="#/asura/${it.slug}" aria-label="${it.title}"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${it.cover || PLACEHOLDER}" alt=""><span class="shade"></span></a><a class="meta" href="#/asura/${it.slug}"><div class="title">${it.title}</div><div class="sub">Asura · ${it.status}</div></a></article>`);
+      render($('#asura-fallback', ctx.el), result.items.length ? rail({ title: 'Explore Asura Scans', sub: 'An independent catalogue', href: '#/asura', items: cards }) : html`<p class="muted">No Asura titles available right now.</p>`);
+    } catch { if (ctx.alive()) render($('#asura-fallback', ctx.el), html`<p class="muted">Asura is also unavailable right now. You can still try the other sources above.</p>`); }
+    return;
+  }
   if (!ctx.alive()) return;
 
   const f = (arr) => arr.map(fromManga);
@@ -33,17 +47,7 @@ export default async function mangaHomePage(ctx) {
         </div></div></div>`)}
       <div class="hero-dots">${feat.map((_, i) => html`<button data-dot="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Slide ${i + 1}"></button>`)}</div></section>` : ''}
 
-    <div class="quick-tiles">
-      ${getSettings().adultManga === true ? html`<a class="tile" href="#/search?type=manga&rating=adult"><span class="tile-ic">${icon('book')}</span><span><b>18+ manga</b><small>Adult-rated MangaDex titles</small></span></a>` : ''}
-      <a class="tile" href="#/asura"><span class="tile-ic">${icon('book')}</span><span><b>Asura Scans</b><small>Browse and read Asura's own catalogue</small></span></a>
-      <a class="tile" href="#/scans/vortex"><span class="tile-ic">${icon('book')}</span><span><b>Vortex Scans</b><small>Free chapters from Vortex</small></span></a>
-      <a class="tile" href="#/scans/hive"><span class="tile-ic">${icon('book')}</span><span><b>Hivetoons · experimental</b><small>Images may be blocked</small></span></a>
-      ${getSettings().adultManga === true ? html`<a class="tile" href="#/scans/omega"><span class="tile-ic">${icon('book')}</span><span><b>Omega Scans · 18+</b><small>Adult catalogue</small></span></a>` : ''}
-      <button class="tile" id="random"><span class="tile-ic">${icon('shuffle')}</span><span><b>Surprise me</b><small>Open a random manga</small></span></button>
-      <a class="tile" href="#/search?type=manga&origin=ko"><span class="tile-ic">${icon('scroll')}</span><span><b>Manhwa</b><small>Korean webtoons</small></span></a>
-      <a class="tile" href="#/search?type=manga&origin=zh"><span class="tile-ic">${icon('layers')}</span><span><b>Manhua</b><small>Chinese comics</small></span></a>
-      <a class="tile" href="#/library"><span class="tile-ic">${icon('library')}</span><span><b>My reading list</b><small>Track your chapters</small></span></a>
-    </div>
+    ${sourceTiles()}
 
     ${hist.length ? rail({ title: 'Continue reading', items: hist.map(continueCard), land: true }) : ''}
     ${rail({ title: 'Popular now', sub: 'Most followed on MangaDex', href: '#/search?type=manga&sort=popular', items: f(feed.popular).map((i) => card(i)) })}
@@ -76,4 +80,19 @@ export default async function mangaHomePage(ctx) {
     render(box, html`<div class="section-head"><h2>Browse by genre</h2></div><div class="chips">${tags.filter((t) => t.group === 'genre').map((t) => html`<a class="chip" href="#/search?type=manga&tag=${t.id}">${t.name}</a>`)}</div>
       <div class="section-head" style="margin-top:26px"><h2>Themes</h2></div><div class="chips">${tags.filter((t) => t.group === 'theme').slice(0, 40).map((t) => html`<a class="chip" href="#/search?type=manga&tag=${t.id}">${t.name}</a>`)}</div>`);
   }).catch(() => {});
+}
+
+function sourceTiles() {
+  return html`<div class="quick-tiles">
+    ${getSettings().adultManga === true ? html`<a class="tile" href="#/search?type=manga&rating=adult"><span class="tile-ic">${icon('book')}</span><span><b>18+ manga</b><small>Adult-rated MangaDex titles</small></span></a>` : ''}
+    <a class="tile" href="#/asura"><span class="tile-ic">${icon('book')}</span><span><b>Asura Scans</b><small>Browse and read Asura's own catalogue</small></span></a>
+    <a class="tile" href="#/scans/vortex"><span class="tile-ic">${icon('book')}</span><span><b>Vortex Scans</b><small>Free chapters from Vortex</small></span></a>
+    <a class="tile" href="#/scans/hive"><span class="tile-ic">${icon('book')}</span><span><b>Hivetoons · experimental</b><small>Images may be blocked</small></span></a>
+    ${getSettings().adultManga === true ? html`<a class="tile" href="#/scans/omega"><span class="tile-ic">${icon('book')}</span><span><b>Omega Scans · 18+</b><small>Adult catalogue</small></span></a>` : ''}
+    <a class="tile" href="#/search?type=manga"><span class="tile-ic">${icon('search')}</span><span><b>Search MangaDex</b><small>Manga, manhwa &amp; manhua</small></span></a>
+    <button class="tile" id="random"><span class="tile-ic">${icon('shuffle')}</span><span><b>Surprise me</b><small>Random MangaDex title</small></span></button>
+    <a class="tile" href="#/search?type=manga&origin=ko"><span class="tile-ic">${icon('scroll')}</span><span><b>Manhwa</b><small>Korean webtoons on MangaDex</small></span></a>
+    <a class="tile" href="#/search?type=manga&origin=zh"><span class="tile-ic">${icon('layers')}</span><span><b>Manhua</b><small>Chinese comics on MangaDex</small></span></a>
+    <a class="tile" href="#/library"><span class="tile-ic">${icon('library')}</span><span><b>My reading list</b><small>Track your chapters</small></span></a>
+  </div>`;
 }
