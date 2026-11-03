@@ -37,7 +37,7 @@ export default async function mangaHomePage(ctx) {
       ${getSettings().adultManga === true ? html`<a class="tile" href="#/search?type=manga&rating=adult"><span class="tile-ic">${icon('book')}</span><span><b>18+ manga</b><small>Adult-rated MangaDex titles</small></span></a>` : ''}
       <a class="tile" href="#/asura"><span class="tile-ic">${icon('book')}</span><span><b>Asura Scans</b><small>Browse and read Asura's own catalogue</small></span></a>
       <a class="tile" href="#/scans/vortex"><span class="tile-ic">${icon('book')}</span><span><b>Vortex Scans</b><small>Free chapters from Vortex</small></span></a>
-      <a class="tile" href="#/scans/hive"><span class="tile-ic">${icon('book')}</span><span><b>Hivetoons</b><small>Browse Hivetoons</small></span></a>
+      <a class="tile" href="#/scans/hive"><span class="tile-ic">${icon('book')}</span><span><b>Hivetoons · experimental</b><small>Images may be blocked</small></span></a>
       ${getSettings().adultManga === true ? html`<a class="tile" href="#/scans/omega"><span class="tile-ic">${icon('book')}</span><span><b>Omega Scans · 18+</b><small>Adult catalogue</small></span></a>` : ''}
       <button class="tile" id="random"><span class="tile-ic">${icon('shuffle')}</span><span><b>Surprise me</b><small>Open a random manga</small></span></button>
       <a class="tile" href="#/search?type=manga&origin=ko"><span class="tile-ic">${icon('scroll')}</span><span><b>Manhwa</b><small>Korean webtoons</small></span></a>

@@ -52,8 +52,8 @@ export function aniweebEmbed(id, episode, audio = 'sub', server = 1) {
 // Separate, documented episode-player endpoints; providers control the streams.
 export const EXTRA_PLAYERS = Object.freeze({
   supaplay: { label: 'SupaPlay', base: 'https://supaplay.fun' },
-  aniembed: { label: 'AniEmbed', base: 'https://aniembed.se' },
-  nexus: { label: 'Movies Nexus', base: 'https://www.moviesnexus.fun' },
+  aniembed: { label: 'AniEmbed · experimental', base: 'https://aniembed.se' },
+  nexus: { label: 'Movies Nexus · experimental', base: 'https://www.moviesnexus.fun' },
 });
 export function extraEmbed(provider, id, episode, audio = 'sub') {
   if (!Object.hasOwn(EXTRA_PLAYERS, provider) || !/^\d+$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || Number(id) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid player, title, episode or audio.');
