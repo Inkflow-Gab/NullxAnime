@@ -8,7 +8,7 @@ const note = (level, text) => console.log(`::${level}::${text.replace(/%/g, '%25
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let browser;
 try {
-  browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: 'shell', args: [...chromium.args, '--no-sandbox'] });
+  browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: 'shell', args: [...chromium.args.filter((arg) => arg !== '--disable-web-security'), '--no-sandbox'] });
   const page = await browser.newPage();
   await page.setRequestInterception(true);
   page.on('request', (req) => req.url() === PROBE ? req.respond({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Gateway probe</title>' }) : req.continue());
