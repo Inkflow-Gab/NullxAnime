@@ -94,9 +94,13 @@ export function anilist(body) {
   if (query.includes('id_in')) return { data: { Page: { media: variables.ids.map((id) => media(id - 1000)) } } };
   if (query.includes('$search')) {
     const q = (variables.search || '').toLowerCase();
-    let items = (query.includes('isAdult: true') ? [media(99, { isAdult: true })] : many(20)).filter((m) => !q || `${m.title.romaji} ${m.title.english}`.toLowerCase().includes(q));
+    const adult = query.includes('isAdult: true');
+    let items = (adult ? [media(99 + (variables.page - 1), { isAdult: true, format: 'OVA', status: 'FINISHED', genres: ['Fantasy', 'Romance'] })] : many(20)).filter((m) => !q || `${m.title.romaji} ${m.title.english}`.toLowerCase().includes(q));
     if (variables.genre) items = items.filter((m) => m.genres.includes(variables.genre));
-    return { data: { Page: { pageInfo: { hasNextPage: variables.page < 2 && items.length > 10, currentPage: variables.page, total: items.length }, media: items } } };
+    if (variables.format) items = items.filter((m) => m.format === variables.format);
+    if (variables.status) items = items.filter((m) => m.status === variables.status);
+    return { data: { Page: { pageInfo: { hasNextPage: variables.page < 2 && (adult ? items.length > 0 : items.length > 10), currentPage: variables.page, total: adult && items.length ? 2 : items.length }, media: items } } };
+
   }
   return { errors: [{ message: 'mock: unknown query' }] };
 }
