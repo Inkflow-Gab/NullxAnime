@@ -20,12 +20,17 @@ export function showUpdateWindow({ force = false } = {}) {
   el.className = 'scrim update-scrim';
   el.id = 'update-notice';
   el.innerHTML = html`<section class="update-window" role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-intro">
-    <div class="update-ornament" aria-hidden="true">✦ &nbsp; SYSTEM NOTICE &nbsp; ✦</div>
-    <h2 id="update-title">Update complete</h2>
+    <div class="update-effects" aria-hidden="true"><span></span><i></i></div>
+    <div class="update-topline" aria-hidden="true"><span>NULLX / SYSTEM</span><span>● &nbsp;ONLINE</span></div>
+    <div class="update-sigil" aria-hidden="true"><span>✦</span></div>
+    <div class="update-ornament" aria-hidden="true">◆ &nbsp; SYSTEM MESSAGE &nbsp; ◆</div>
+    <h2 id="update-title">UPDATE COMPLETE</h2>
     <p class="update-subtitle" id="update-intro">${RELEASE.title}</p>
     <div class="update-divider" aria-hidden="true"><span>◆</span></div>
+    <div class="update-log-label" aria-hidden="true"><span>RELEASE LOG</span><span>NEW DATA ACQUIRED</span></div>
     <ul class="update-changes">${RELEASE.changes.map((change) => html`<li>${change}</li>`)}</ul>
-    <button class="update-ok" type="button">OK</button>
+    <button class="update-ok" type="button"><span>OK</span><span aria-hidden="true">›</span></button>
+    <div class="update-foot" aria-hidden="true"><span>◆ &nbsp; NULLXANIME</span><span>STATUS: UPDATED</span></div>
   </section>`.toString();
   $('#overlay-root').appendChild(el);
   const button = $('.update-ok', el);

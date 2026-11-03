@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import worker from '../manga-gateway/worker.js';
+const origin = 'https://inkflow-gab.github.io';
+const run = (path, init = {}) => worker.fetch(new Request(`https://gateway.test${path}`, { headers: { Origin: origin, Cookie: 'secret=never-forward' }, ...init }));
+const originalFetch = globalThis.fetch;
+let calls = [];
+try {
+  globalThis.fetch = async (url, init) => { calls.push({ url, init }); return Response.json({ data: [{ slug: 'sample' }] }); };
+  let response = await run('/asura/series?limit=20&offset=0&sort=popular&search=hero');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-origin'), origin);
+  assert.equal(calls[0].url, 'https://api.asurascans.com/api/series?limit=20&offset=0&sort=popular&search=hero');
+  assert.deepEqual(calls[0].init.headers, { Accept: 'application/json' });
+  assert.equal(calls[0].init.redirect, 'manual');
+  for (const path of ['/asura/series/test-title', '/asura/series/test-title/chapters', '/asura/series/test-title/chapters/1.5', '/vortex/api/query?searchTerm=test&orderBy=latestChapter&page=1&perPage=18', '/vortex/api/post?postSlug=test-title', '/vortex/api/chapters?postId=12', '/vortex/api/chapter?chapterId=5']) assert.equal((await run(path)).status, 200, path);
+  const previousCalls = calls.length;
+  for (const path of ['/asura/https://evil.test', '/vortex/api/chapter?chapterId=1&url=https://evil.test', '/vortex/api/chapter?chapterId=0', '/vortex/api/chapters?postId=1&postId=2', '/asura/series?limit=999999', '/asura/series/test/chapters/../../../private', '/vortex/api/query?orderBy=other', '/vortex/api/post?postSlug=../evil']) assert.notEqual((await run(path)).status, 200, path);
+  assert.equal(calls.length, previousCalls);
+  assert.equal((await run('/asura/series', { method: 'POST' })).status, 405);
+  assert.equal((await run('/asura/series', { headers: { Origin: 'https://evil.test' } })).status, 403);
+  globalThis.fetch = async () => new Response('', { status: 302, headers: { Location: 'https://evil.test' } });
+  assert.equal((await run('/asura/series')).status, 502);
+  globalThis.fetch = async () => new Response('not json');
+  assert.equal((await run('/asura/series')).status, 502);
+  globalThis.fetch = async () => new Response('x'.repeat(3 * 1024 * 1024 + 1));
+  assert.equal((await run('/asura/series')).status, 502);
+  globalThis.fetch = async () => new Response('', { status: 403 });
+  assert.equal((await run('/asura/series')).status, 403);
+  console.log('Restricted manga gateway checks passed');
+} finally { globalThis.fetch = originalFetch; }

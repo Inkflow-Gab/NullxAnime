@@ -1,6 +1,7 @@
 // JSON-based community catalogues. These services control access and may change.
 import { cached, MIN } from '../cache.js';
-import { sleep, requestTimeout } from '../util.js';
+import { sleep } from '../util.js';
+import { mangaJSON } from './mangaTransport.js';
 import { getSettings } from '../store.js';
 
 export const SCANS = Object.freeze({
@@ -35,11 +36,8 @@ async function request(source, path) {
   nextRequest.set(source, Date.now() + wait + 1100);
   if (wait) await sleep(wait);
   if (config.adult && getSettings().adultManga !== true) throw new Error('Enable 18+ manga in Settings to access this source.');
-  let response;
-  try { response = await fetch(config.origin + path, { credentials: 'omit', headers: { Accept: 'application/json' }, signal: requestTimeout(15000) }); }
-  catch { throw new Error(`${config.label} could not be reached. Browser cross-origin restrictions, a provider check or regional blocking may prevent access.`); }
-  if (!response.ok) throw new Error(`${config.label} returned HTTP ${response.status}. Try again later.`);
-  try { return await response.json(); } catch { throw new Error(`${config.label} did not return its catalogue. A provider check may be required.`); }
+  try { return await mangaJSON(source, config.origin + path, path); }
+  catch (error) { if (/^HTTP \d+$/.test(error.message)) throw new Error(`${config.label} returned ${error.message}. Try again later.`); throw new Error(`${config.label} could not be reached. Browser cross-origin restrictions, a provider check or regional blocking may prevent access.`); }
 }
 function omegaSeries(item, config) {
   return { id: numeric(item.id), slug: id(item.series_slug), title: String(item.title || 'Untitled'), cover: image(item.thumbnail, config), description: String(item.description || ''), status: String(item.status || ''), type: 'Comic', author: String(item.author || '') };

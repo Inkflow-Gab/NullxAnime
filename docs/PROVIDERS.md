@@ -80,3 +80,11 @@ Omega Scans, Vortex Scans and Hivetoons have separate clients in `js/api/scans.j
 ### Ads and redirects
 
 Aniweeb and configured third-party mirrors run in sandboxed iframes without popup or top-navigation permissions. Instant play has an opt-in sandbox because the provider may refuse to play in one. Sandboxing can prevent popup windows and parent-page redirects; it cannot inspect or block ads, redirects within the frame, tracking, or embedded ad media. A third-party player or browser may still fail. No provider security challenges are automatically bypassed.
+
+### Optional Asura / Vortex JSON gateway
+
+The reader can fall back to `manga-gateway/worker.js` after a direct public API request fails, but **no gateway is deployed or configured by this repository**. A static GitHub Pages site cannot run it. Its default configuration in `js/config.js` is empty, so deploying the frontend alone does not resolve a blocked catalogue.
+
+To enable it, the site operator needs a separate Cloudflare Workers deployment. Review the provider's terms and access restrictions, deploy `manga-gateway/wrangler.toml` using an authenticated operator account, set `mangaGateway` in `js/config.js` to the resulting HTTPS worker base, then redeploy Pages. The end user never enters an endpoint or credentials. Only the existing Pages origin is allowed in `manga-gateway/worker.js`; change that allowlist deliberately if hosting elsewhere. Never commit credentials.
+
+The relay supports only a small allowlist of public Asura/Vortex JSON paths and bounded query parameters; it does not proxy arbitrary URLs, forward cookies or authorization, follow redirects, serve images, access MangaDex, solve challenges, or unlock paid content. Search terms and titles sent to the relay are visible to its operator. Origin checks are not authentication; before exposing it, configure Cloudflare-side rate limiting and usage controls to prevent abuse. Even after deployment, a provider can block the relay, alter its API, or deny image access. Test the catalogue, unlocked chapter list and actual images from the affected browser before describing it as working.
