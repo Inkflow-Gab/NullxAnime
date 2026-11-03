@@ -147,8 +147,8 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('System breach') &&
-        dialog.textContent.includes('experimental') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('More ways to browse') &&
+        dialog.textContent.includes('not age verification') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
   check('system window animates and respects reduced motion', await (async () => {
@@ -593,10 +593,43 @@ try {
     const after = networkRequests.filter((u) => u.includes(`/at-home/server/${chapter}`)).length;
     return detailBlocked && (await text('.empty')).includes('18+ manga is off') && before === after;
   })());
+  check('adult section and anime direct routes are gated by default', await (async () => {
+    await visit('/adult', '.empty');
+    const gated = (await text('.empty')).includes('off') && await count('[data-nav="adult"]') === 0;
+    await visit('/anime/1099', '.empty');
+    const detailGated = (await text('.empty')).includes('Not available');
+    await visit('/watch/1099/1', '.hero-slide.active');
+    return gated && detailGated && !(await page.$('#stage'));
+  })());
+  check('adult confirmation rejects wrong answers and supports cancellation', await (async () => {
+    await visit('/settings', '[data-tg="adultManga"]');
+    await page.$eval('[data-tg="adultManga"]', (e) => e.click());
+    const answer = await page.$eval('#adult-question', (e) => { const [a, b, c] = e.textContent.match(/\d+/g).map(Number); return a * b - c; });
+    await page.$eval('#adult-answer', (e, n) => { e.value = n; }, answer);
+    await page.$eval('#adult-gate', (e) => e.requestSubmit());
+    const noDeclaration = (await text('#adult-error')).includes('confirm') && await count('[data-nav="adult"]') === 0;
+    await page.$eval('#adult-declare', (e) => e.click());
+    await page.$eval('#adult-answer', (e) => { e.value = '-1'; });
+    await page.$eval('#adult-gate', (e) => e.requestSubmit());
+    const denied = (await text('#adult-error')).includes('correct') && await count('[data-nav="adult"]') === 0;
+    await page.$eval('#adult-cancel', (e) => e.click());
+    return noDeclaration && denied && await page.$eval('#adult-gate', (e) => e.hidden) && !(await page.$eval('[data-tg="adultManga"]', (e) => e.checked));
+  })());
   check('18+ opt-in enables adult search and reader; turning it off hides history', await (async () => {
     await visit('/settings', '[data-tg="adultManga"]');
-    page.once('dialog', (dialog) => dialog.accept());
     await page.$eval('[data-tg="adultManga"]', (e) => e.click());
+    await page.$eval('#adult-declare', (e) => e.click());
+    const answer = await page.$eval('#adult-question', (e) => { const [a, b, c] = e.textContent.match(/\d+/g).map(Number); return a * b - c; });
+    await page.$eval('#adult-answer', (e, n) => { e.value = n; }, answer);
+    await page.$eval('#adult-gate', (e) => e.requestSubmit());
+    await visit('/adult', '#adult-grid .card');
+    const nav = await count('[data-nav="adult"]') === 2;
+    const adultBadge = (await text('#adult-grid .card')).includes('18+');
+    await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
+    const mobileNav = await page.$eval('#tabbar [data-nav="adult"]', (el) => { const r = el.getBoundingClientRect(); return getComputedStyle(el.parentElement).display === 'flex' && r.left >= 0 && r.right <= innerWidth; });
+    await page.setViewport({ width: 1440, height: 900 });
+    await visit('/watch/1099/1', '#markbtn');
+    await page.$eval('#markbtn', (e) => e.click());
     await visit('/search?type=manga&rating=adult', '.grid .card');
     const badge = (await text('.grid .card')).includes('18+');
     await visit('/scans/omega', '#scans-grid .card', { timeout: 10000 });
@@ -615,7 +648,43 @@ try {
     await visit('/settings', '[data-tg="adultManga"]');
     await page.$eval('[data-tg="adultManga"]', (e) => e.click());
     const hidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('manga').some((h) => h.contentRating === 'erotica'));
-    return badge && requested && pages && hidden && omegaOk;
+    const animeHidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('anime').some((h) => h.id === '1099') && !(await import('./js/store.js')).allEntries('anime').some((e) => e.id === '1099'));
+    return badge && requested && pages && hidden && omegaOk && nav && mobileNav && adultBadge && animeHidden;
+  })());
+
+  check('backup import never enables adult mode', await (async () => {
+    return page.evaluate(async () => {
+      const store = await import('./js/store.js');
+      store.importAll({ app: 'NullxAnime', settings: { adultManga: true, adultConfirmation: true } });
+      return !store.getSettings().adultManga && !store.getSettings().adultConfirmation && !document.querySelector('[data-nav="adult"]');
+    });
+  })());
+  check('listing view persists across anime and manga', await (async () => {
+    await visit('/search?type=anime', '#grid .card');
+    await page.$eval('[data-layout="list"]', (e) => e.click());
+    const list = await page.$eval('#grid', (e) => e.classList.contains('list-view'));
+    await visit('/manga', '#comic-grid .card', { timeout: 10000 });
+    const persisted = await page.$eval('#comic-grid', (e) => e.classList.contains('list-view'));
+    await page.$eval('[data-layout="grid"]', (e) => e.click());
+    return list && persisted && !(await page.$eval('#comic-grid', (e) => e.classList.contains('list-view')));
+  })());
+  check('reader tools change width and jump to a page', await (async () => {
+    await visit('/read/00000000-0000-4000-8000-000000000000/11111111-0000-4000-8000-000000000001', '.reader .rwrap');
+    await page.$eval('.reader-tools summary', (e) => e.click());
+    await page.$eval('#reader-width', (e) => { e.value = '70'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.$eval('#reader-page', (e) => { e.value = '3'; });
+    await page.$eval('#reader-jump', (e) => e.requestSubmit());
+    const width = await page.$eval('.reader', (e) => e.style.getPropertyValue('--reader-page-width') === '70%') && await page.evaluate(async () => (await import('./js/store.js')).getSettings().readerWidth === 70);
+    await page.$eval('#modes [data-mode="rtl"]', (e) => e.click());
+    await page.$eval('.reader-tools summary', (e) => e.click());
+    await page.$eval('#reader-page', (e) => { e.value = '3'; });
+    await page.$eval('#reader-jump', (e) => e.requestSubmit());
+    const paged = await page.$eval('#rcount', (e) => e.textContent.startsWith('3 /'));
+    await visit('/scans/vortex/mock-iken/1', '.reader-tools', { timeout: 10000 });
+    const scan = await page.$eval('.reader', (e) => e.style.getPropertyValue('--reader-page-width') === '70%');
+    await visit('/asura/mock-series/1', '.reader', { timeout: 10000 });
+    const asura = !!(await page.$('.reader-tools'));
+    return width && paged && scan && asura;
   })());
 
   console.log('Tracker, discover, settings');
@@ -722,6 +791,8 @@ try {
   check('small phone manga sorting and connection check fit the screen', await (async () => {
     await visit('/manga?q=Mock', '#comic-grid');
     await page.click('.comic-diagnostic summary');
+    await page.$eval('#comic-check', (el) => el.scrollIntoView({ block: 'center' }));
+    await new Promise((r) => setTimeout(r, 500));
     await page.click('#comic-check');
     try { await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length >= 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'), { timeout: 12000 }); } catch (error) { console.error('Diagnostic state:', await page.$eval('#comic-check-results', (el) => el.textContent)); throw error; }
     return await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && !!document.querySelector('#comic-sort a.on') && !document.querySelector('#comic-check').disabled);

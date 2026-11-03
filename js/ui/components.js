@@ -29,7 +29,7 @@ export function fromAnime(m) {
     type: 'anime', id: String(m.id), title: titleOf(m), cover: m.coverImage?.extraLarge || m.coverImage?.large || '',
     color: m.coverImage?.color, banner: m.bannerImage, score: m.averageScore ? (m.averageScore / 10).toFixed(1) : null,
     sub: bits.join(' · '), total: m.episodes || null, format: m.format, status: m.status, next: m.nextAiringEpisode,
-    href: `#/anime/${m.id}`, raw: m,
+    href: `#/anime/${m.id}`, raw: m, contentRating: m.isAdult ? 'pornographic' : 'safe',
   });
 }
 const ORIGIN = { ja: 'Manga', ko: 'Manhwa', zh: 'Manhua', 'zh-hk': 'Manhua' };
@@ -49,7 +49,7 @@ export function card(item, opts = {}) {
   const s = getSettings();
   const next = item.next;
   const badges = [];
-  if (item.type === 'manga' && ['erotica', 'pornographic'].includes(item.contentRating)) badges.push(html`<span class="badge">18+</span>`);
+  if (['erotica', 'pornographic'].includes(item.contentRating)) badges.push(html`<span class="badge">18+</span>`);
   if (item.score) badges.push(html`<span class="badge score">${icon('star')}${item.score}</span>`);
   if (item.type === 'manga' && item.origin && item.origin !== 'Manga') badges.push(html`<span class="badge accent">${item.origin}</span>`);
   const bl = [];

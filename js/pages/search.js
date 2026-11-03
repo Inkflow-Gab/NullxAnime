@@ -1,3 +1,4 @@
+import { layoutControls, layoutClass, bindBrowseLayout } from '../ui/browseLayout.js';
 // Unified search & browse page for anime (AniList) and manga (MangaDex).
 
 import { html, render, $, $$, on, hashQuery, currentSeason, titleCase, debounce } from '../util.js';
@@ -99,6 +100,7 @@ export default async function search(ctx) {
   $('#sform').addEventListener('submit', (e) => { e.preventDefault(); go(mk({ q: new FormData(e.target).get('q') })); });
   on(ctx.el, 'change', '[data-f]', (e, t) => go(mk({ [t.dataset.f]: t.value })));
 
+  bindBrowseLayout(ctx.el);
   const results = $('#results'), more = $('#more'), morebtn = $('#morebtn');
   let page = 1, offset = 0, total = 0, shown = 0;
   const fetchPage = async () => {
@@ -119,7 +121,7 @@ export default async function search(ctx) {
       total = r.total; shown += r.items.length;
       if (first) {
         if (!r.items.length) { render(results, emptyBox('search', 'No results', 'Try different keywords or loosen the filters.', html`<a class="btn primary" href="#/search?type=${type}">Reset filters</a>`)); more.hidden = true; return; }
-        render(results, html`<div class="muted" style="margin:0 0 14px">${total ? `${total.toLocaleString()} results` : ''}</div><div class="grid" id="grid">${r.items.map((i) => card(i))}</div>`);
+        render(results, html`<div class="browse-head"><div class="muted">${total ? `${total.toLocaleString()} results` : 'Results'}</div>${layoutControls()}</div><div class="grid layout-grid ${layoutClass()}" id="grid">${r.items.map((i) => card(i))}</div>`);
       } else $('#grid').insertAdjacentHTML('beforeend', r.items.map((i) => card(i)).join(''));
       more.hidden = !r.hasNext;
     } catch (e) { if (ctx.alive()) { if (first) render(results, type === 'manga' ? html`${errorBox(e, { title: 'MangaDex is unavailable' })}<div class="row" style="justify-content:center"><a class="btn" href="#/manga?q=${encodeURIComponent(text)}">Search other sources</a><a class="btn" href="#/asura?q=${encodeURIComponent(text)}">Search Asura instead</a><a class="btn" href="#/manga">Other manga sources</a></div>` : errorBox(e)); else morebtn.textContent = 'Retry'; } }

@@ -20,7 +20,7 @@ export default async function watch(ctx) {
   let m;
   try { m = await mediaDetail(id); } catch (e) { ctx.render(html`<div class="container page">${errorBox(e)}</div>`); return; }
   if (!ctx.alive()) return;
-  if (m.isAdult) { go('/'); return; }
+  if (m.isAdult && getSettings().adultManga !== true) { go('/'); return; }
 
   const item = fromAnime(m);
   const count = episodeCount(m);
@@ -33,7 +33,7 @@ export default async function watch(ctx) {
   const epLabel = isMovie ? 'Full feature' : `Episode ${ep}`;
   ctx.setTitle(`${item.title} — ${epLabel}`);
 
-  pushHistory({ type: 'anime', id, title: item.title, cover: item.cover, ep, label: isMovie ? 'Movie' : `EP ${ep}` });
+  pushHistory({ type: 'anime', id, contentRating: m.isAdult ? 'pornographic' : 'safe', title: item.title, cover: item.cover, ep, label: isMovie ? 'Movie' : `EP ${ep}` });
   const e0 = getEntry('anime', id);
   if (e0 && e0.status === 'planning') saveEntry('anime', id, { status: 'current' });
 
@@ -115,7 +115,7 @@ export default async function watch(ctx) {
     const now = toggleMark('anime', id, ep, force);
     if (now) {
       const e = getEntry('anime', id);
-      if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status === 'completed' ? 'completed' : 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format });
+      if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status === 'completed' ? 'completed' : 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format, contentRating: item.contentRating });
       toast(`Episode ${ep} marked as watched`);
     }
     return now;
@@ -500,7 +500,7 @@ export default async function watch(ctx) {
     if (next < 0) return;
     e.preventDefault(); select(tabs[next]); const button = $(`[data-src="${tabs[next].id}"]`, ctx.el); button?.focus({ preventScroll: true }); button?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   });
-  $('#markbtn').addEventListener('click', () => { const on_ = toggleMark('anime', id, ep); if (on_) { const e = getEntry('anime', id); if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format }); } });
+  $('#markbtn').addEventListener('click', () => { const on_ = toggleMark('anime', id, ep); if (on_) { const e = getEntry('anime', id); if (!e || ep > (e.progress || 0)) saveEntry('anime', id, { progress: ep, status: e?.status || 'current' }, { title: item.title, cover: item.cover, total: m.episodes, format: m.format, contentRating: item.contentRating }); } });
   $('#autonext').addEventListener('change', (e) => setSetting('autoNext', e.target.checked));
   $('#episode-search')?.addEventListener('input', (event) => {
     const query = event.target.value.trim().toLowerCase(); let visible = 0;

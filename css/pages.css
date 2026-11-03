@@ -390,3 +390,41 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .comic-check-list { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
 .comic-check-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; }
 .comic-check-list b { color: var(--text); }
+
+/* Catalogue views and optional adult section */
+.browse-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 14px; flex-wrap: wrap; }
+.browse-head h2 { margin: 0; }
+.browse-layout { display: flex; gap: 4px; align-items: center; color: var(--muted); font-size: 13px; }
+.browse-layout button { border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 10px; color: var(--text-2); }
+.browse-layout button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: white; }
+.grid.layout-grid.list-view { grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.layout-grid.list-view .card { display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 12px; align-items: center; padding: 9px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.layout-grid.list-view .card .poster { width: 88px; }
+.layout-grid.list-view .card .meta { min-width: 0; padding: 0 34px 0 0; }
+.layout-grid.list-view .card .quick { top: 10px; right: 10px; }
+.adult-heading { padding: clamp(18px, 3vw, 32px); border: 1px solid var(--line-2); border-radius: 20px; background: linear-gradient(125deg, rgba(var(--accent-rgb), .17), var(--surface)); margin-bottom: 16px; }
+.adult-heading h1 { margin: 12px 0 6px; }
+.adult-heading p { max-width: 70ch; }
+.adult-links { margin-bottom: 18px; }
+#adult-search { flex-wrap: wrap; }
+#adult-query { width: min(360px, 100%); }
+.adult-gate { border: 1px solid var(--line-2); border-radius: 14px; padding: 18px; background: var(--surface-2); margin: 12px 0; }
+.adult-gate:not([hidden]) { display: grid; gap: 10px; }
+.adult-gate p { color: var(--muted); }
+.adult-gate #adult-error { color: #fb7185; }
+.adult-declaration { display: flex; gap: 8px; align-items: flex-start; }
+#adult-answer { max-width: 180px; }
+
+/* Compact controls are above the paged-reader tap zones. */
+.reader-tools { position: fixed; z-index: 96; bottom: max(14px, env(safe-area-inset-bottom)); left: 14px; color: #eceaf7; }
+.reader-tools summary { cursor: pointer; list-style: none; padding: 8px 13px; border: 1px solid var(--line-2); border-radius: 99px; background: #171722; font-weight: 700; }
+.reader-tools summary::-webkit-details-marker { display: none; }
+.reader-tools-panel { position: absolute; bottom: 48px; left: 0; width: min(280px, calc(100vw - 28px)); max-height: 65vh; overflow: auto; padding: 16px; display: grid; gap: 10px; border: 1px solid var(--line-2); border-radius: 14px; background: #171722; box-shadow: 0 8px 32px #0009; }
+.reader-tools-panel label { font-size: 13px; font-weight: 700; }
+.reader-tools-panel small { color: #b5b1c3; }
+.reader-tools-panel input[type="range"] { width: 100%; accent-color: var(--accent); }
+.reader-tools-panel #reader-jump { display: grid; gap: 6px; }
+.reader-tools-panel #reader-page { width: 90px; }
+.reader[data-fit="width"] .reader-view.vertical .rpage { width: min(900px, var(--reader-page-width, 100%)); }
+.reader[data-fit="width"] .paged .rpage { width: var(--reader-page-width, 100%); }
+@media (max-width: 420px) { .browse-layout { font-size: 12px; } .tabbar a { font-size: 9px; } }

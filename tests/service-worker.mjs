@@ -26,7 +26,7 @@ const server = http.createServer(async (req, res) => {
     if (breakSchedule && file === '/js/pages/schedule.js') return res.writeHead(503).end('temporary failure');
     let contents = await readFile(join(ROOT, file));
     if (breakMain && file === '/js/main.js') contents = Buffer.from("import { missingExport } from './util.js';");
-    if (file === '/sw.js') contents = Buffer.from(release === 'legacy' ? legacyWorker : contents.toString().replace("const VERSION = 'nx-v15';", `const VERSION = '${release === 'fixed' ? 'nx-v15' : 'nx-v16'}';`));
+    if (file === '/sw.js') contents = Buffer.from(release === 'legacy' ? legacyWorker : contents.toString().replace(/const VERSION = 'nx-v\d+';/, `const VERSION = '${release === 'fixed' ? 'nx-v15' : 'nx-v16'}';`));
     if (release === 'legacy' && file === '/js/main.js') contents = Buffer.from(legacyMain);
     if (release === 'legacy' && file === '/js/util.js') contents = Buffer.from(contents.toString().replace('export function requestTimeout(', 'function requestTimeout('));
     if (release !== 'legacy' && file === '/js/data/release.js') contents = Buffer.from(`${contents}\nexport const TEST_MARKER = ${JSON.stringify(release)};\n`);

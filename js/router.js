@@ -20,6 +20,7 @@ const routes = [
   ['/manga/:id', () => import('./pages/mangaDetail.js'), 'manga'],
   ['/read/:id/:chapter', () => import('./pages/reader.js'), 'manga'],
   ['/search', () => import('./pages/search.js'), null],
+  ['/adult', () => import('./pages/adult.js'), 'adult'],
   ['/releases', () => import('./pages/releases.js'), 'anime'],
   ['/schedule', () => import('./pages/schedule.js'), 'schedule'],
   ['/library', () => import('./pages/library.js'), 'library'],
