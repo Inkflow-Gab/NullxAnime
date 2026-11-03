@@ -428,3 +428,21 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .reader[data-fit="width"] .reader-view.vertical .rpage { width: min(900px, var(--reader-page-width, 100%)); }
 .reader[data-fit="width"] .paged .rpage { width: var(--reader-page-width, 100%); }
 @media (max-width: 420px) { .browse-layout { font-size: 12px; } .tabbar a { font-size: 9px; } }
+
+/* Adult catalogue controls: compact on phones, readable on large screens. */
+.adult-sources { margin: 0 0 16px; padding: 15px 18px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.adult-sources summary { cursor: pointer; font-weight: 700; }
+.adult-sources p { margin: 9px 0 12px; font-size: 13px; }
+.adult-explore { display: grid; gap: 16px; padding: clamp(16px, 2vw, 24px); border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.adult-search { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.adult-search-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.adult-search-row #adult-query { flex: 1 1 220px; width: auto; max-width: 500px; }
+.adult-sort { display: flex; flex-wrap: wrap; gap: 7px; }
+.adult-sort a { padding: 8px 15px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--text-2); font-weight: 700; }
+.adult-sort a:hover { border-color: var(--accent); }
+.adult-sort a.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+.adult-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.adult-filters label { display: grid; flex: 1 1 135px; gap: 6px; max-width: 230px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.adult-filters .select { width: 100%; }
+.adult-filter-note { font-size: 12.5px; line-height: 1.5; }
+@media (max-width: 420px) { .adult-filters label { max-width: none; } .adult-sort a { padding: 7px 11px; font-size: 13px; } }

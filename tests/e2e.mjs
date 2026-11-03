@@ -45,6 +45,7 @@ let blockSampleImage = false;
 let blockReaderImages = false;
 const networkRequests = [];
 const releaseQueries = [];
+const adultQueries = [];
 async function mockNetwork(page) {
   await page.setRequestInterception(true);
   page.on('request', (req) => {
@@ -72,7 +73,7 @@ async function mockNetwork(page) {
     if (u.hostname === 'anipub.test' && u.pathname === '/AniPlayer/42/1') return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><video><source src="/videos/episode.mp4"></video></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname.startsWith('/AniPlayer/')) return req.respond({ status: 200, contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<section class="video-section"><div class="video-container"><iframe src="https://anipub.test/video-embed"></iframe></div></section>' });
     if (u.hostname === 'anipub.test' && u.pathname === '/video-embed') return req.respond({ status: 200, contentType: 'text/html', body: 'Episode player mock' });
-    if (u.hostname === 'graphql.anilist.co') { const body = req.postData() || '{}'; if (body.includes('RecentEpisodes')) releaseQueries.push(JSON.parse(body)); return req.respond(json(anilist(body))); }
+    if (u.hostname === 'graphql.anilist.co') { const body = req.postData() || '{}'; if (body.includes('RecentEpisodes')) releaseQueries.push(JSON.parse(body)); if (body.includes('isAdult: true')) adultQueries.push(JSON.parse(body)); return req.respond(json(anilist(body))); }
     if (blockAllManga && !gatewayRequest && ['api.asurascans.com', 'api.vortexscans.org', 'api.mangadex.org'].includes(u.hostname)) return req.respond({ status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{}' });
     if (u.hostname === 'api.asurascans.com') {
       const comic = { slug: 'mock-series', title: 'Mock Asura Manhwa', type: 'manhwa', status: 'ongoing', cover: 'https://cdn.asurascans.com/asura-images/covers/mock.webp', description: '<p>A mock series.</p>', chapter_count: 2 };
@@ -147,8 +148,8 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('More ways to browse') &&
-        dialog.textContent.includes('not age verification') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('More ways to discover') &&
+        dialog.textContent.includes('not verified') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
   check('system window animates and respects reduced motion', await (async () => {
@@ -594,12 +595,14 @@ try {
     return detailBlocked && (await text('.empty')).includes('18+ manga is off') && before === after;
   })());
   check('adult section and anime direct routes are gated by default', await (async () => {
-    await visit('/adult', '.empty');
+    const before = adultQueries.length;
+    await visit('/adult?sort=latest&genre=Fantasy', '.empty');
+    const noAdultFetch = adultQueries.length === before;
     const gated = (await text('.empty')).includes('off') && await count('[data-nav="adult"]') === 0;
     await visit('/anime/1099', '.empty');
     const detailGated = (await text('.empty')).includes('Not available');
     await visit('/watch/1099/1', '.hero-slide.active');
-    return gated && detailGated && !(await page.$('#stage'));
+    return noAdultFetch && gated && detailGated && !(await page.$('#stage'));
   })());
   check('adult confirmation rejects wrong answers and supports cancellation', await (async () => {
     await visit('/settings', '[data-tg="adultManga"]');
@@ -623,6 +626,30 @@ try {
     await page.$eval('#adult-answer', (e, n) => { e.value = n; }, answer);
     await page.$eval('#adult-gate', (e) => e.requestSubmit());
     await visit('/adult', '#adult-grid .card');
+    const externalLinks = await page.$$eval('.adult-sources a', (links) => links.length === 4 && links.every((a) => a.target === '_blank' && a.rel.includes('noopener') && a.rel.includes('noreferrer')) && links.some((a) => a.href === 'https://hentaigasm.com/genre/uncensored/'));
+    const defaultQuery = adultQueries.at(-1);
+    const defaultCorrect = defaultQuery?.variables.sort[0] === 'POPULARITY_DESC';
+    await page.$eval('.adult-sort a[href*="sort=latest"]', (e) => e.click());
+    await page.waitForFunction(() => location.hash.includes('sort=latest'));
+    await page.waitForFunction(() => document.querySelector('#adult-count')?.textContent.includes('shown'));
+    const latestQuery = adultQueries.at(-1);
+    const latest = latestQuery?.variables.sort[0] === 'START_DATE_DESC' && (await text('.adult-filter-note')).includes('not episode upload');
+    await page.select('[data-filter="genre"]', 'Fantasy');
+    await page.waitForFunction(() => location.hash.includes('genre=Fantasy'));
+    await page.waitForFunction(() => document.querySelector('#adult-count')?.textContent.includes('shown'));
+    const genreQuery = adultQueries.at(-1);
+    const genreOk = genreQuery?.variables.genre === 'Fantasy' && genreQuery?.variables.sort[0] === 'START_DATE_DESC';
+    await page.select('[data-filter="format"]', 'OVA');
+    await page.waitForFunction(() => location.hash.includes('format=OVA'));
+    await page.waitForFunction(() => document.querySelector('#adult-count')?.textContent.includes('shown'));
+    const formatQuery = adultQueries.at(-1);
+    const formatOk = formatQuery?.variables.format === 'OVA' && formatQuery?.variables.genre === 'Fantasy';
+    await page.$eval('#adult-more', (e) => e.click());
+    await page.waitForFunction(() => document.querySelectorAll('#adult-grid .card').length === 2);
+    const paged = adultQueries.at(-1)?.variables.page === 2;
+    const versionNote = (await text('.adult-filter-note')).includes('uncensored editions');
+    await visit('/adult', '#adult-grid .card');
+    const filtersOk = defaultCorrect && latest && genreOk && formatOk && paged && versionNote;
     const nav = await count('[data-nav="adult"]') === 2;
     const adultBadge = (await text('#adult-grid .card')).includes('18+');
     await page.setViewport({ width: 320, height: 640, isMobile: true, hasTouch: true });
@@ -650,7 +677,7 @@ try {
     await page.$eval('[data-tg="adultManga"]', (e) => e.click());
     const hidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('manga').some((h) => h.contentRating === 'erotica'));
     const animeHidden = await page.evaluate(async () => !(await import('./js/store.js')).getHistory('anime').some((h) => h.id === '1099') && !(await import('./js/store.js')).allEntries('anime').some((e) => e.id === '1099'));
-    return badge && requested && pages && hidden && omegaOk && nav && mobileNav && adultBadge && animeHidden;
+    return badge && requested && pages && hidden && omegaOk && nav && mobileNav && adultBadge && animeHidden && filtersOk && externalLinks;
   })());
 
   check('backup import never enables adult mode', await (async () => {
