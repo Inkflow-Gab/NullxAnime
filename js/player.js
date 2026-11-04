@@ -28,7 +28,8 @@ export function srtToVtt(srt) {
 export function createPlayer(host, opts = {}) {
   const { src, poster, subtitle, format, crossOrigin = false, startAt = 0, onProgress, onEnded, onError, autoplay = false, label = '' } = opts;
   host.innerHTML = html`<div class="vp" tabindex="0" aria-label="${label || 'Video player'}">
-    <video playsinline preload="metadata" ${poster ? html`poster="${poster}"` : ''}></video>
+    <video playsinline webkit-playsinline preload="metadata" ${poster ? html`poster="${poster}"` : ''}></video>
+    <button type="button" class="vp-native-toggle" hidden aria-pressed="false">TV controls</button>
     <div class="vp-center"><button class="vp-bigplay" aria-label="Play">${icon('play')}</button><div class="spinner vp-spin" hidden></div></div>
     <div class="vp-msg" hidden></div>
     <div class="vp-controls">
@@ -53,17 +54,27 @@ export function createPlayer(host, opts = {}) {
   if (crossOrigin) v.crossOrigin = 'anonymous';
   const range = $('.vp-range', root), volRange = $('.vp-volrange', root), time = $('.vp-time', root);
   const buf = $('.vp-buf', root), spin = $('.vp-spin', root), msg = $('.vp-msg', root), big = $('.vp-bigplay', root);
-  const btn = (n) => $(`[data-c="${n}"]`, root);
-  let hls = null, hideT, lastSave = 0, destroyed = false, seeking = false, levels = [], levelIdx = -1, speedI = 2;
+  const btn = (n) => $(`[data-c="${n}"]`, root), nativeToggle = $('.vp-native-toggle', root);
+  const tvMode = document.documentElement.dataset.tvMode === 'on';
+  if (tvMode) { nativeToggle.hidden = false; v.preload = 'auto'; }
+  let hls = null, hideT, stallT, lastSave = 0, destroyed = false, seeking = false, levels = [], levelIdx = -1, speedI = 2, mediaRecoveries = 0;
   const blobs = [];
 
-  const vol = Number(localStorage.getItem('nx:vol') ?? 1);
-  v.volume = isNaN(vol) ? 1 : vol; volRange.value = v.volume;
-  v.muted = localStorage.getItem('nx:muted') === '1';
+  let vol = 1, muted = false;
+  try { vol = Number(localStorage.getItem('nx:vol') ?? 1); muted = localStorage.getItem('nx:muted') === '1'; } catch { /* storage may be disabled on a TV */ }
+  v.volume = Number.isFinite(vol) ? clamp(vol, 0, 1) : 1; volRange.value = v.volume;
+  v.muted = muted;
 
   const setIcon = (b, name) => { b.innerHTML = icon(name).toString(); };
   const showMsg = (t) => { msg.hidden = !t; msg.textContent = t || ''; };
   const fail = (text) => { spin.hidden = true; showMsg(text); onError?.(text); };
+  // Old TV browsers sometimes return no Promise from play(); others reject or throw.
+  const requestPlay = (quiet = false) => {
+    try {
+      const result = v.play();
+      if (result && typeof result.catch === 'function') result.catch(() => { if (!destroyed && !quiet && v.paused) fail('Playback could not start. Try TV controls, another source, or a compatible video format.'); });
+    } catch { if (!quiet) fail('Playback could not start. Try TV controls, another source, or a compatible video format.'); }
+  };
 
   /* ----- source ----- */
   (async () => {
@@ -74,7 +85,7 @@ export function createPlayer(host, opts = {}) {
           const Hls = await loadHls();
           if (destroyed) return;
           if (!Hls.isSupported()) throw new Error('This browser cannot play HLS streams.');
-          hls = new Hls({ maxBufferLength: 40, enableWorker: true });
+          hls = new Hls({ maxBufferLength: tvMode ? 20 : 40, enableWorker: !tvMode });
           hls.loadSource(src); hls.attachMedia(v);
           hls.on(Hls.Events.MANIFEST_PARSED, (_, d) => {
             levels = d.levels.map((l, i) => ({ i, h: l.height })).filter((l) => l.h).sort((a, b) => b.h - a.h);
@@ -83,13 +94,13 @@ export function createPlayer(host, opts = {}) {
           hls.on(Hls.Events.ERROR, (_, d) => {
             if (!d.fatal) return;
             if (d.type === Hls.ErrorTypes.NETWORK_ERROR) fail('Network error — the stream may be blocked or expired.');
-            else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+            else if (d.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveries++ === 0) hls.recoverMediaError();
             else fail('This stream could not be played.');
           });
         }
       } else v.src = src;
       if (subtitle) await addSubtitle(subtitle);
-      if (autoplay) v.play().catch(() => {});
+      if (autoplay) requestPlay(true);
     } catch (e) { fail(e.message); }
   })();
 
@@ -127,11 +138,14 @@ export function createPlayer(host, opts = {}) {
     if (Date.now() - lastSave > 5000 && v.duration) { lastSave = Date.now(); onProgress?.(v.currentTime, v.duration); }
   });
   v.addEventListener('progress', paint);
-  v.addEventListener('play', syncPlay); v.addEventListener('pause', () => { syncPlay(); if (v.duration) onProgress?.(v.currentTime, v.duration); });
+  v.addEventListener('play', syncPlay); v.addEventListener('pause', () => { clearTimeout(stallT); spin.hidden = true; syncPlay(); if (v.duration) onProgress?.(v.currentTime, v.duration); });
   v.addEventListener('ended', () => { syncPlay(); onProgress?.(v.duration, v.duration); onEnded?.(); });
-  v.addEventListener('waiting', () => { spin.hidden = false; });
-  v.addEventListener('playing', () => { spin.hidden = true; showMsg(''); });
-  v.addEventListener('canplay', () => { spin.hidden = true; });
+  v.addEventListener('waiting', () => {
+    spin.hidden = false; clearTimeout(stallT);
+    stallT = setTimeout(() => { if (!destroyed && !v.paused) showMsg('Still buffering. Try another source or a lower quality. Some TVs cannot play every video format.'); }, 12000);
+  });
+  v.addEventListener('playing', () => { clearTimeout(stallT); spin.hidden = true; showMsg(''); });
+  v.addEventListener('canplay', () => { clearTimeout(stallT); spin.hidden = true; });
   v.addEventListener('error', () => {
     if (hls) return;
     fail(v.error?.code === 4 ? 'This file or format can’t be played (it may be blocked from other websites).' : 'Playback error.');
@@ -139,12 +153,12 @@ export function createPlayer(host, opts = {}) {
   v.addEventListener('volumechange', () => {
     setIcon(btn('mute'), v.muted || v.volume === 0 ? 'mute' : 'volume');
     volRange.value = v.muted ? 0 : v.volume;
-    localStorage.setItem('nx:vol', String(v.volume)); localStorage.setItem('nx:muted', v.muted ? '1' : '0');
+    try { localStorage.setItem('nx:vol', String(v.volume)); localStorage.setItem('nx:muted', v.muted ? '1' : '0'); } catch { /* storage may be disabled */ }
   });
 
   /* ----- controls ----- */
-  const toggle = () => (v.paused ? v.play().catch(() => {}) : v.pause());
-  const skip = (s) => { v.currentTime = clamp(v.currentTime + s, 0, v.duration || 1e9); bumpControls(); };
+  const toggle = () => (v.paused ? requestPlay() : v.pause());
+  const skip = (s) => { try { v.currentTime = clamp(v.currentTime + s, 0, v.duration || 1e9); } catch { showMsg('The stream is not ready to seek yet.'); } bumpControls(); };
   const fullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else { const request = (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root); request?.catch?.(() => {}); }
@@ -154,12 +168,18 @@ export function createPlayer(host, opts = {}) {
     if (playing()) hideT = setTimeout(() => root.classList.remove('show'), 2600);
   };
   big.addEventListener('click', toggle);
-  v.addEventListener('click', toggle);
+  v.addEventListener('click', () => { if (!v.controls) toggle(); });
+  const setNativeControls = (enabled) => {
+    v.controls = enabled; v.tabIndex = enabled ? 0 : -1; root.classList.toggle('native-controls', enabled);
+    nativeToggle.setAttribute('aria-pressed', String(enabled)); nativeToggle.textContent = enabled ? 'App controls' : 'TV controls';
+    if (tvMode) (enabled ? v : root).focus({ preventScroll: true });
+  };
+  nativeToggle.addEventListener('click', () => setNativeControls(!v.controls));
   v.addEventListener('dblclick', fullscreen);
   root.addEventListener('mousemove', bumpControls);
   root.addEventListener('touchstart', bumpControls, { passive: true });
   root.addEventListener('mouseleave', () => { if (playing()) root.classList.remove('show'); });
-  range.addEventListener('input', () => { seeking = true; if (v.duration) { v.currentTime = (range.value / 1000) * v.duration; paint(); } });
+  range.addEventListener('input', () => { seeking = true; if (v.duration) { try { v.currentTime = (range.value / 1000) * v.duration; paint(); } catch { showMsg('The stream is not ready to seek yet.'); } } });
   range.addEventListener('change', () => { seeking = false; });
   volRange.addEventListener('input', () => { v.muted = false; v.volume = Number(volRange.value); });
   root.addEventListener('click', (e) => {
@@ -188,14 +208,19 @@ export function createPlayer(host, opts = {}) {
   /* keyboard — active when the player (or page body) has focus */
   const onKey = (e) => {
     const t = e.target;
-    if (t !== document.body && t !== root && t !== v) return;
+    if (e.defaultPrevented || (t !== document.body && t !== root && t !== v)) return;
+    if (t === v && v.controls) {
+      if (tvMode && (['Escape', 'BrowserBack', 'GoBack'].includes(e.key) || [461, 10009].includes(e.keyCode))) { e.preventDefault(); setNativeControls(false); }
+      return;
+    }
     if (t === document.body && document.documentElement.dataset.tvMode === 'on' && /^Arrow/.test(e.key)) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (document.getElementById('palette') || document.getElementById('shortcuts')) return;
-    const k = e.key.toLowerCase();
+    const codes = { 13: 'enter', 415: 'mediaplay', 19: 'mediapause', 179: 'mediaplaypause', 412: 'mediarewind', 417: 'mediafastforward' };
+    const k = (e.key && e.key !== 'Unidentified' ? e.key : codes[e.keyCode] || '').toLowerCase();
     let used = true;
-    if (k === ' ' || k === 'k' || k === 'mediaplaypause') toggle();
-    else if (k === 'mediaplay') v.play().catch(() => {});
+    if (k === ' ' || k === 'k' || k === 'mediaplaypause' || (k === 'enter' && tvMode && (t === root || t === v))) toggle();
+    else if (k === 'mediaplay') requestPlay();
     else if (k === 'mediapause') v.pause();
     else if (k === 'mediarewind') skip(-10);
     else if (k === 'mediafastforward') skip(10);
@@ -219,7 +244,7 @@ export function createPlayer(host, opts = {}) {
     video: v,
     destroy() {
       destroyed = true;
-      clearTimeout(hideT);
+      clearTimeout(hideT); clearTimeout(stallT);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('fullscreenchange', onFullscreen);
       if (v.duration) onProgress?.(v.currentTime, v.duration);

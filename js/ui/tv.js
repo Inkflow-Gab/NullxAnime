@@ -1,5 +1,5 @@
 // Optional spatial navigation for keyboard-like TV remotes.
-const SELECTOR = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+const SELECTOR = 'a[href], iframe[title], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 const EXCLUDED = 'input, select, textarea, [contenteditable="true"], [role="tablist"], .vp, .reader, .scrim, .popover';
 const DIRECTIONS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
@@ -24,10 +24,13 @@ export function nearestDirectional(current, candidates, direction) {
 export function installTvNavigation() {
   document.addEventListener('keydown', (event) => {
     if (document.documentElement.dataset.tvMode !== 'on' || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
-    if (!DIRECTIONS[event.key] || !(event.target instanceof Element) || event.target.closest(EXCLUDED)) return;
+    const playerRoot = event.target instanceof Element && event.target.matches('.vp');
+    if (!DIRECTIONS[event.key] || !(event.target instanceof Element) || (!playerRoot && event.target.closest(EXCLUDED))) return;
+    // Left/right belongs to the player for seeking; up/down can leave the player.
+    if (playerRoot && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) return;
     if (document.querySelector('.scrim, .popover')) return;
     const items = [...document.querySelectorAll(SELECTOR)].filter((element) => {
-      if (element.tabIndex < 0 || element.closest('[hidden], [aria-hidden="true"], .vp, .reader') || element.getAttribute('aria-disabled') === 'true' || element.classList.contains('disabled')) return false;
+      if (element.tabIndex < 0 || element.closest('[hidden], [aria-hidden="true"], .reader') || (element.closest('.vp') && !element.matches('.vp, .vp-native-toggle')) || element.getAttribute('aria-disabled') === 'true' || element.classList.contains('disabled')) return false;
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
       return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;

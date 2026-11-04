@@ -560,3 +560,13 @@ body.reading .app { animation: none; transform: none; }
 .profile-note { display: flex; align-items: flex-start; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; }.profile-note > svg { flex: none; color: var(--accent); }.profile-note p { color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }.profile-note a { color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }.profile-note a svg { width: 16px; }
 @media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; }.profile-banner { padding: 24px 20px; }.profile-stat-grid div { padding: 11px; }.profile-note code { font-size: 11px; } }
 .manga-home .card .title { display: block; overflow: visible; }
+
+/* Player compatibility: do not imply that an external iframe is under our control. */
+.player-sandbox-notice { display: flex; align-items: center; gap: 14px; justify-content: space-between; padding: 13px 16px; margin-bottom: 12px; border: 1px solid #d7aa68; border-radius: 12px; background: #312417; color: #fff2d5; }
+.player-sandbox-notice p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; }.player-sandbox-notice button { flex: none; }
+.tv-playback-help { margin: 12px 0; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.tv-playback-help summary { cursor: pointer; font-weight: 700; }.tv-playback-help p { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.vp-native-toggle { position: absolute; z-index: 5; top: 10px; right: 10px; padding: 7px 12px; border: 1px solid #fff8; border-radius: 8px; color: #fff; background: #111d; font-weight: 700; cursor: pointer; }
+.vp.native-controls .vp-controls, .vp.native-controls .vp-center { display: none; }
+html[data-tv-mode="on"] .vp:focus, html[data-tv-mode="on"] .vp-native-toggle:focus, html[data-tv-mode="on"] .video-frame iframe:focus { outline: 3px solid #d8b6ff; outline-offset: -3px; }
+@media (max-width: 600px) { .player-sandbox-notice { align-items: flex-start; flex-direction: column; }.player-sandbox-notice button { max-width: 100%; white-space: normal; } }

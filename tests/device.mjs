@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { detectDevice, useLightweightEffects } from '../js/ui/device.js';
 assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (SMART-TV; Tizen 7.0)' }), 'tv');
+assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (Linux; VIDAA)' }), 'tv');
+assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 Hisense' }), 'tv');
 assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (Linux; Android 12; Mobile)' }), 'phone');
 assert.equal(detectDevice({ userAgent: 'Mozilla/5.0 (iPad)' }), 'tablet');
 assert.equal(detectDevice({ userAgent: 'Windows NT 10.0' }), 'desktop');
