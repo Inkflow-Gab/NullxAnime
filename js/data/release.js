@@ -5,6 +5,6 @@ export const RELEASE = Object.freeze({
   changes: [
     'Explore featured anime with new carousel controls and a polished update entrance.',
     'Filter manga, manhwa and manhua by Asura, Vortex or MangaDex.',
-    'Try experimental VidNest and Zokoanime servers; playback and episode matching vary.',
+    'Anime alternatives are easier to find; playback and episode matching are not guaranteed.',
   ],
 });

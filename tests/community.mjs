@@ -11,8 +11,6 @@ assert.equal(extraEmbed('aniembed', 154587, 2, 'dub'), 'https://aniembed.se/e/15
 assert.equal(extraEmbed('nexus', 154587, 2, 'sub'), 'https://www.moviesnexus.fun/anime/154587/2/sub');
 assert.equal(extraEmbed('megavid', 154587, 2, 'dub'), 'https://megavid.buzz/ani/154587/2/dub');
 assert.equal(extraEmbed('shonen', 154587, 2, 'sub', 'https://inkflow-gab.github.io'), 'https://shonen.to/embed/anilist/154587/2?language=sub&parentOrigin=https%3A%2F%2Finkflow-gab.github.io');
-assert.equal(extraEmbed('vidnest', 154587, 2, 'sub'), 'https://vidnest.fun/anime/154587/2/sub');
-assert.equal(extraEmbed('zoko', 154587, 2, 'dub'), 'https://zokoanime.video/stream/anilist/154587/2/dub?autoplay=0');
 assert.throws(() => extraEmbed('shonen', 1, 1, 'sub', 'https://evil.test/path'));
 assert.throws(() => extraEmbed('shonen', 1, 1, 'sub', 'javascript:alert(1)'));
 for (const args of [['other', 1, 1], ['supaplay', '../1', 1], ['nexus', 1, -1], ['aniembed', 1, 1, 'raw']]) assert.throws(() => extraEmbed(...args));

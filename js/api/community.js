@@ -56,8 +56,6 @@ export const EXTRA_PLAYERS = Object.freeze({
   nexus: { label: 'Movies Nexus · experimental', base: 'https://www.moviesnexus.fun' },
   megavid: { label: 'MegaVid · experimental', base: 'https://megavid.buzz' },
   shonen: { label: 'Shonen · experimental', base: 'https://shonen.to' },
-  vidnest: { label: 'VidNest · experimental', base: 'https://vidnest.fun' },
-  zoko: { label: 'Zokoanime · experimental', base: 'https://zokoanime.video' },
 });
 export function extraEmbed(provider, id, episode, audio = 'sub', parentOrigin = '') {
   if (!Object.hasOwn(EXTRA_PLAYERS, provider) || !/^\d+$/.test(String(id)) || !Number.isSafeInteger(Number(id)) || Number(id) < 1 || !Number.isSafeInteger(episode) || episode < 1 || !['sub', 'dub'].includes(audio)) throw new Error('Invalid player, title, episode or audio.');
@@ -65,8 +63,6 @@ export function extraEmbed(provider, id, episode, audio = 'sub', parentOrigin = 
   if (provider === 'supaplay') return `${base}/stream/ani/${title}/${episode}/${audio}`;
   if (provider === 'aniembed') return `${base}/e/${title}/${episode}?${new URLSearchParams({ lang: audio })}`;
   if (provider === 'megavid') return `${base}/ani/${title}/${episode}/${audio}`;
-  if (provider === 'vidnest') return `${base}/anime/${title}/${episode}/${audio}`;
-  if (provider === 'zoko') return `${base}/stream/anilist/${title}/${episode}/${audio}?autoplay=0`;
   if (provider === 'shonen') {
     let origin;
     try { origin = new URL(parentOrigin); } catch { throw new Error('A valid embedding origin is required.'); }

@@ -57,7 +57,7 @@ async function mockNetwork(page) {
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/data/release.js' && mockNextRelease) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const RELEASE = { id: 'test-next-release', title: 'Future update', changes: ['New future feature'] };" });
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && (!useLiveGateway || mockProviderEndpoints || mockMangaGateway)) return req.respond({ status: 200, contentType: 'text/javascript', body: `export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: '${mockProviderEndpoints ? 'https://kitsune-api.test/api' : ''}', streamWorker: '${mockProviderEndpoints ? 'https://stream.test' : ''}', aniPub: '${mockProviderEndpoints ? 'https://anipub.test' : ''}', mangaGateway: '${mockMangaGateway ? 'https://manga-gateway.test' : ''}' });` });
     if (u.origin === new URL(BASE).origin) return req.continue();
-    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun', 'megavid.buzz', 'shonen.to', 'vidnest.fun', 'zokoanime.video'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
+    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun', 'megavid.buzz', 'shonen.to'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'api.aniweeb.net') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Aniweeb episode mock</body></html>' });
     if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/mkissa/1000') return req.respond(json({ providers: { mkissa: { episodes: { sub: [{ id: 'watch/mkissa/1000/sub/mkissa-1', number: 1 }] } } } }));
@@ -149,7 +149,7 @@ try {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
       return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A more vivid NullxAnime') &&
-        dialog.textContent.includes('episode matching vary') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
+        dialog.textContent.includes('episode matching are not guaranteed') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
   check('system window animates and respects reduced motion', await (async () => {
@@ -329,6 +329,11 @@ try {
     return await page.$eval('#stage iframe', (e) => e.src.endsWith('/1000/1/sub'));
   })());
   check('unwanted watch tabs are removed', await (async () => !(await page.$('[data-src="yt-0"]')) && !(await page.$('[data-src="trailer"]')) && !(await page.$('[data-src="mine"]')) && !(await page.$('[data-src="official"]')))());
+  check('anime alternatives prioritize the sample-tested players', await (async () => {
+    await visit('/watch/1000/1', '#tabs [data-src]');
+    const ids = await page.$$eval('#tabs [data-src]', (tabs) => tabs.map((tab) => tab.dataset.src));
+    return ids.slice(0, 4).join(',') === 'instant,supaplay,megavid,aniweeb';
+  })());
   check('Aniweeb offers built-in episode servers', await (async () => {
     await page.$eval('[data-src="aniweeb"]', (e) => e.click());
     const first = await page.$eval('#stage iframe', (e) => e.src === 'https://api.aniweeb.net/embed/ani/1000/1?track=sub&server=1');
@@ -337,7 +342,7 @@ try {
     return first && await page.$eval('#stage iframe', (e) => e.src === 'https://api.aniweeb.net/embed/ani/1000/1?track=dub&server=2') && !(await page.$('#panel input[type="url"]'));
   })());
   check('additional episode players use sandboxed embeds and audio choices', await (async () => {
-    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun'], ['megavid', 'megavid.buzz'], ['shonen', 'shonen.to'], ['vidnest', 'vidnest.fun'], ['zoko', 'zokoanime.video']]) {
+    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun'], ['megavid', 'megavid.buzz'], ['shonen', 'shonen.to']]) {
       await page.$eval(`[data-src="${id}"]`, (e) => e.click());
       const first = await page.$eval('#stage iframe', (f) => ({ host: new URL(f.src).hostname, sandbox: f.getAttribute('sandbox') }));
       if (first.host !== host || !first.sandbox || first.sandbox.includes('allow-popups')) return false;
