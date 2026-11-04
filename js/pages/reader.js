@@ -207,7 +207,7 @@ export default async function reader(ctx) {
   };
   document.addEventListener('keydown', onKey);
   cleanups.push(() => document.removeEventListener('keydown', onKey));
-  const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen(); else rd.requestFullscreen?.().catch(() => {}); };
+  const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); else document.documentElement.requestFullscreen?.().catch(() => toast('Fullscreen is unavailable in this browser.', 'err')); };
   $('#rfull').addEventListener('click', toggleFull);
   $('#chsel').addEventListener('change', (e) => go(`/read/${id}/${e.target.value}`));
   $('#modes').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) { setSetting('readerMode', b.dataset.mode); mount(); } });
@@ -231,5 +231,5 @@ export default async function reader(ctx) {
   attachReaderTools(ctx, rd, pages.length, (index) => {
     if (s.readerMode === 'vertical') rv.querySelector(`.rwrap[data-i="${index}"]`)?.scrollIntoView({ block: 'start' });
     else show(index);
-  });
+  }, { setMode: () => mount(), setFit: () => { s = getSettings(); } });
 }

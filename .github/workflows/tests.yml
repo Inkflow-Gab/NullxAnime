@@ -24,6 +24,9 @@ jobs:
       - name: Probe adult video players (non-blocking)
         continue-on-error: true
         run: node tests/live-adult-players.mjs
+      - name: Probe additional manhwa candidates from Pages origin (non-blocking)
+        continue-on-error: true
+        run: node tests/live-manhwa-candidates.mjs
       - name: Probe manga relay from Pages origin (non-blocking)
         continue-on-error: true
         run: node tests/live-manga-gateway.mjs

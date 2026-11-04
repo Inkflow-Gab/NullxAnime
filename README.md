@@ -102,3 +102,6 @@ The adult anime catalogue has Popular, Latest, Trending and Top rated sorting, p
 
 ### Featured anime and catalogue sources
 The anime hero has previous, next, and pause controls, and starts paused when reduced motion is enabled. Manga, manhwa and manhua discovery can be filtered to Asura, Vortex or MangaDex while retaining the search and sort. Each provider controls its own catalogue and availability. Anime alternatives are prioritized based on a single sample, not proof of correct episode identity or reliable availability; third-party players can contain ads.
+
+### Reader studio
+MangaDex, Asura and scan readers share a compact dock with previous/next page, jump, fullscreen and a settings sheet. Choose long strip or left-to-right/right-to-left pages, width/height/original fit, page spacing and a user-controlled auto-scroll speed. Fullscreen depends on the browser and may be unavailable on some devices. Comic format tabs filter by source-reported format and only the returned results; unknown formats are excluded. Hivetoons is available as an explicitly experimental source filter, not included in the all-sources mix; its images were blocked in a prior sample. No new source is claimed working solely from a catalogue response.

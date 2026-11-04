@@ -14,7 +14,7 @@ export default async function mangaHomePage(ctx) {
   const lang = getSettings().mangaLang;
   // Keep independent catalogues reachable even when MangaDex blocks this browser.
   const hist = getHistory('manga').slice(0, 14);
-  const focusedSource = ['asura', 'vortex', 'mangadex'].includes(ctx.query.source);
+  const focusedSource = ['asura', 'vortex', 'mangadex', 'hive'].includes(ctx.query.source) || ['manga', 'manhwa', 'manhua'].includes(ctx.query.format);
   ctx.render(html`<div class="container page"><div id="comic-discovery"></div>${!ctx.query.q?.trim() && !focusedSource && hist.length ? rail({ title: 'Continue reading', items: hist.map(continueCard), land: true }) : ''}<div id="manga-legacy" ${ctx.query.q?.trim() || focusedSource ? 'hidden' : ''}>${sourceTiles()}<div id="manga-loading">${skelRail()}</div></div></div>`);
   mountComicDiscovery(ctx);
   if (ctx.query.q?.trim() || focusedSource) return;

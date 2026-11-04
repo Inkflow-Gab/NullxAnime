@@ -48,16 +48,19 @@ export async function mountComicDiscovery(ctx) {
   if (!box) return;
   const q = String(ctx.query.q || '').trim().slice(0, 150);
   const sort = ctx.query.sort === 'popular' ? 'popular' : 'latest';
-  const source = ['asura', 'vortex', 'mangadex'].includes(ctx.query.source) ? ctx.query.source : 'all';
-  const route = (patch = {}) => `/manga${hashQuery({ q, sort: sort === 'latest' ? '' : sort, source: source === 'all' ? '' : source, ...patch })}`;
+  const source = ['asura', 'vortex', 'mangadex', 'hive'].includes(ctx.query.source) ? ctx.query.source : 'all';
+  const format = ['manga', 'manhwa', 'manhua'].includes(ctx.query.format) ? ctx.query.format : 'all';
+  const route = (patch = {}) => `/manga${hashQuery({ q, sort: sort === 'latest' ? '' : sort, source: source === 'all' ? '' : source, format: format === 'all' ? '' : format, ...patch })}`;
   const link = (s) => `#${route({ sort: s === 'latest' ? '' : s })}`;
   render(box, html`<section class="section comic-discovery">
     <div class="search-head"><div><h1 class="page-title">Manga, manhwa &amp; manhua</h1><p class="muted">Explore available catalogues together or browse one source. Open a title, then find its chapters by provider.</p></div></div>
     <form id="comic-search" class="filter-bar"><label class="sr-only" for="comic-query">Search manga, manhwa and manhua</label><input class="input" id="comic-query" value="${q}" placeholder="Search manga, manhwa or manhua…" style="max-width:500px;flex:1"><button class="btn primary">${icon('search')} Search</button>${q ? html`<a class="btn" href="#${route({ q: '' })}">Clear</a>` : ''}</form>
-    <nav class="seg comic-sort" id="comic-sort" aria-label="Manga sorting"><a href="${link('latest')}" class="${sort === 'latest' ? 'on' : ''}" ${sort === 'latest' ? html`aria-current="page"` : ''}>Latest</a><a href="${link('popular')}" class="${sort === 'popular' ? 'on' : ''}" ${sort === 'popular' ? html`aria-current="page"` : ''}>Popular</a></nav>
-    <nav class="comic-sources" aria-label="Manga catalogue source">${[['all', 'All sources'], ['asura', 'Asura'], ['vortex', 'Vortex'], ['mangadex', 'MangaDex']].map(([value, label]) => html`<a href="#${route({ source: value === 'all' ? '' : value })}" class="${source === value ? 'on' : ''}" ${source === value ? html`aria-current="page"` : ''}>${label}</a>`)}</nav>
+    <nav class="seg comic-sort source-tabs tabs-scroll" id="comic-sort" aria-label="Manga sorting"><a href="${link('latest')}" class="${sort === 'latest' ? 'on' : ''}" ${sort === 'latest' ? html`aria-current="page"` : ''}>Latest</a><a href="${link('popular')}" class="${sort === 'popular' ? 'on' : ''}" ${sort === 'popular' ? html`aria-current="page"` : ''}>Popular</a></nav>
+    <nav class="comic-formats source-tabs tabs-scroll" aria-label="Comic format">${[['all', 'All formats'], ['manga', 'Manga'], ['manhwa', 'Manhwa'], ['manhua', 'Manhua']].map(([value, label]) => html`<a class="chip ${format === value ? 'active' : ''}" href="#${route({ format: value === 'all' ? '' : value })}" ${format === value ? html`aria-current="page"` : ''}>${label}</a>`)}</nav>
+    <nav class="comic-sources" aria-label="Manga catalogue source">${[['all', 'All sources'], ['asura', 'Asura'], ['vortex', 'Vortex'], ['mangadex', 'MangaDex'], ['hive', 'Hivetoons · experimental']].map(([value, label]) => html`<a href="#${route({ source: value === 'all' ? '' : value })}" class="${source === value ? 'on' : ''}" ${source === value ? html`aria-current="page"` : ''}>${label}</a>`)}</nav>
+    ${source === 'hive' ? html`<p class="notice">Hivetoons is experimental: its catalogue or chapter images may be blocked in your browser or region.</p>` : ''}
     <div class="browse-head"><h2>${q ? `Matches for “${q}”` : sort === 'popular' ? 'Popular manga & manhwa' : 'Recently updated'}</h2>${layoutControls()}</div>
-    <p class="muted comic-help">${source === 'all' ? (sort === 'popular' ? 'Popular results from each source, mixed together; not a single global ranking.' : 'Recent results from each source; ordering is limited to the titles returned.') : 'Showing results from the selected source only.'} Chapter access can change.</p>
+    <p class="muted comic-help">${source === 'all' ? (sort === 'popular' ? 'Popular results from each source, mixed together; not a single global ranking.' : 'Recent results from each source; ordering is limited to the titles returned.') : 'Showing results from the selected source only.'} ${format !== 'all' ? ' Format filters use each source’s reported format and only the returned results; titles without a known format are excluded.' : ''} Chapter access can change.</p>
     <div id="comic-results">${skelGrid(8)}</div><div id="comic-status" class="muted" role="status"></div>
     <details class="comic-diagnostic"><summary>Having trouble connecting?</summary><p class="muted">Check direct and relay catalogue connections and sample page images from this device. Manga searches and chapter requests may go through the relay. This does not test every title. A failure may be caused by the provider, browser, network, or region.</p><button class="btn sm" id="comic-check" type="button">Check connections</button><div id="comic-check-results" role="status" aria-live="polite"></div></details>
   </section>`);
@@ -82,17 +85,24 @@ export async function mountComicDiscovery(ctx) {
   const requests = [
     { name: 'Asura', source: 'asura', load: () => asuraSearch(q, 1, sort) },
     { name: 'Vortex', source: 'vortex', load: () => scansSearch('vortex', q, 1, sort) },
-    { name: 'MangaDex', source: 'mangadex', load: () => listManga({ q, limit: 20, lang: getSettings().mangaLang, order: sort === 'popular' ? { followedCount: 'desc' } : { latestUploadedChapter: 'desc' } }) },
+    ...(source === 'hive' ? [{ name: 'Hivetoons', source: 'hive', load: () => scansSearch('hive', q, 1, sort) }] : []),
+    { name: 'MangaDex', source: 'mangadex', load: () => listManga({ q, limit: 20, lang: getSettings().mangaLang, order: sort === 'popular' ? { followedCount: 'desc' } : { latestUploadedChapter: 'desc' }, origin: format === 'manga' ? ['ja'] : format === 'manhwa' ? ['ko'] : format === 'manhua' ? ['zh', 'zh-hk'] : undefined }) },
   ].filter((item) => source === 'all' || item.source === source);
   const results = Array(requests.length).fill(null);
   const paint = () => {
     if (!ctx.alive()) return;
-    const lists = results.map((r, i) => r?.status === 'fulfilled' ? r.value.items.map((item) => ({ ...item, slug: item.slug || item.id, type: item.type === 'manga' ? 'Manga' : item.type, updatedAt: typeof item.updatedAt === 'string' ? Date.parse(item.updatedAt) || 0 : item.updatedAt, source: requests[i].source, sourceName: requests[i].name })) : []);
+    const lists = results.map((r, i) => r?.status === 'fulfilled' ? r.value.items.map((item) => ({ ...item, slug: item.slug || item.id, type: requests[i].source === 'mangadex' ? ({ ja: 'Manga', ko: 'Manhwa', zh: 'Manhua', 'zh-hk': 'Manhua' }[item.originalLanguage] || 'Comic') : item.type, updatedAt: typeof item.updatedAt === 'string' ? Date.parse(item.updatedAt) || 0 : item.updatedAt, source: requests[i].source, sourceName: requests[i].name })) : []);
+    const classify = (item) => {
+      if (item.source === 'mangadex') return item.originalLanguage === 'ja' ? 'manga' : item.originalLanguage === 'ko' ? 'manhwa' : ['zh', 'zh-hk'].includes(item.originalLanguage) ? 'manhua' : '';
+      const type = String(item.type || '').toLowerCase();
+      return ['manga', 'manhwa', 'manhua'].includes(type) ? type : '';
+    };
     let entries;
     if (sort === 'popular') {
       entries = [];
       for (let i = 0; i < Math.max(0, ...lists.map((list) => list.length)); i++) for (const list of lists) if (list[i]) entries.push(list[i]);
     } else entries = lists.flat().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (format !== 'all') entries = entries.filter((item) => classify(item) === format);
     const failed = results.flatMap((r, i) => r?.status === 'rejected' ? [requests[i].name] : []);
     const seen = new Set();
     const unique = entries.filter((it) => { const key = it.title.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); if (seen.has(key)) return false; seen.add(key); return true; });

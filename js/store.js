@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS = {
   adultConfirmation: false,
   browseLayout: 'grid',
   readerWidth: 100,
+  readerGap: 0,
+  readerSpeed: 100,
   readerMode: 'vertical', // vertical | ltr | rtl
   readerFit: 'width',     // width | height | original
   readerDataSaver: false,
