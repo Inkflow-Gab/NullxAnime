@@ -2,8 +2,9 @@
 
 import { html, render, $, $$, mdPlain, titleCase } from '../util.js';
 import { icon } from '../ui/icons.js';
+import { searchMedia } from '../api/anilist.js';
 import { mangaHome, tagList, randomManga } from '../api/mangadex.js';
-import { card, rail, fromManga, continueCard, skelRail, toast, PLACEHOLDER } from '../ui/components.js';
+import { card, rail, fromManga, titleOf, continueCard, skelRail, toast, PLACEHOLDER } from '../ui/components.js';
 import { getHistory, getSettings } from '../store.js';
 import { go } from '../router.js';
 import { asuraSearch } from '../api/asura.js';
@@ -15,13 +16,27 @@ export default async function mangaHomePage(ctx) {
   // Keep independent catalogues reachable even when MangaDex blocks this browser.
   const hist = getHistory('manga').slice(0, 14);
   const focusedSource = ['asura', 'vortex', 'mangadex', 'hive'].includes(ctx.query.source) || ['manga', 'manhwa', 'manhua'].includes(ctx.query.format);
-  ctx.render(html`<div class="container page"><div id="comic-discovery"></div>${!ctx.query.q?.trim() && !focusedSource && hist.length ? rail({ title: 'Continue reading', items: hist.map(continueCard), land: true }) : ''}<div id="manga-legacy" ${ctx.query.q?.trim() || focusedSource ? 'hidden' : ''}>${sourceTiles()}<div id="manga-loading">${skelRail()}</div></div></div>`);
+  ctx.render(html`<div class="container page manga-home">${!ctx.query.q?.trim() && !focusedSource ? html`<header class="manga-welcome"><span>THE READING ROOM</span><h1>Find your next story.</h1><p>Discover manga, manhwa and manhua across available catalogues.</p></header>${hist.length ? rail({ title: 'Continue reading', items: hist.map(continueCard), land: true }) : ''}<div id="manga-trending">${skelRail(6)}</div><div id="manga-releases">${skelRail(6)}</div><div id="manga-upcoming">${skelRail(6)}</div><div id="manga-top">${skelRail(6)}</div>` : ''}<div id="comic-discovery"></div><div id="manga-legacy" ${ctx.query.q?.trim() || focusedSource ? 'hidden' : ''}>${sourceTiles()}<div id="manga-loading">${skelRail()}</div></div></div>`);
   mountComicDiscovery(ctx);
   if (ctx.query.q?.trim() || focusedSource) return;
+  // AniList provides metadata, not chapters. A click searches the actual catalogues.
+  for (const [selector, title, sort, status] of [['#manga-trending', 'Trending now', 'TRENDING_DESC', undefined], ['#manga-upcoming', 'Upcoming releases', 'POPULARITY_DESC', 'NOT_YET_RELEASED']]) {
+    searchMedia({ type: 'MANGA', perPage: 16, sort, status }).then(({ items }) => {
+      if (!ctx.alive()) return;
+      const cards = items.filter((m) => !m.isAdult).map((m) => {
+        const name = titleOf(m), href = `#/manga?q=${encodeURIComponent(name)}`;
+        const d = m.startDate || {};
+        const date = d.year ? [d.year, ...(d.month ? [d.month, ...(d.day ? [d.day] : [])] : [])].map((part, i) => i ? String(part).padStart(2, '0') : String(part)).join('-') : '';
+        return html`<article class="card"><a class="poster" href="${href}" aria-label="Search for ${name}"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${m.coverImage?.large || PLACEHOLDER}" alt=""><span class="shade"></span><span class="tl"><span class="badge accent">AniList</span></span><span class="play">${icon('search')}</span></a><a class="meta" href="${href}"><div class="title">${name}</div><div class="sub">${status ? `Upcoming${date ? ` · ${date}` : ''} · ` : ''}Search catalogues</div></a></article>`;
+      });
+      render($(selector, ctx.el), cards.length ? rail({ title, sub: status ? 'AniList metadata · chapters may not be available yet' : 'Trending on AniList · open to search sources', items: cards }) : html`<section class="section"><h2>${title}</h2><p class="muted">No titles available right now.</p></section>`);
+    }).catch(() => { if (ctx.alive()) render($(selector, ctx.el), html`<section class="section"><h2>${title}</h2><p class="muted">AniList metadata is unavailable right now.</p></section>`); });
+  }
   let feed;
   try { feed = await mangaHome(lang); } catch {
     if (!ctx.alive()) return;
     $('#random', ctx.el)?.remove();
+    for (const [selector, title] of [['#manga-releases', 'New releases'], ['#manga-top', 'Top rated']]) render($(selector, ctx.el), html`<section class="section"><h2>${title}</h2><p class="muted">MangaDex is unavailable. Try another source below.</p></section>`);
     const box = $('#manga-loading', ctx.el);
     render(box, html`<section class="section"><h2>MangaDex is unavailable</h2><p class="muted">MangaDex may block access in your browser or region. Try another source above; MangaDex titles and chapters may remain unavailable.</p><button class="btn" data-action="retry">Try MangaDex again</button><div id="asura-fallback">${skelRail(6)}</div></section>`);
     try {
@@ -35,6 +50,8 @@ export default async function mangaHomePage(ctx) {
   if (!ctx.alive()) return;
 
   const f = (arr) => arr.map(fromManga);
+  render($('#manga-releases', ctx.el), rail({ title: 'New releases', sub: 'Recently uploaded chapters on MangaDex', href: '#/search?type=manga&sort=latest', items: f(feed.latest).map((i) => card(i)) }));
+  render($('#manga-top', ctx.el), rail({ title: 'Top rated', sub: 'MangaDex community ratings', href: '#/search?type=manga&sort=rating', items: f(feed.top).map((i) => card(i)) }));
   const feat = f(feed.popular).filter((m) => m.cover).slice(0, 6);
   render($('#manga-legacy', ctx.el), html`<div style="padding-top:18px">
     ${feat.length ? html`<section class="mhero" id="mhero">${feat.map((it, i) => html`<div class="mhero-slide ${i === 0 ? 'active' : ''}">
@@ -54,8 +71,6 @@ export default async function mangaHomePage(ctx) {
     ${sourceTiles()}
 
     ${rail({ title: 'Popular now', sub: 'Most followed on MangaDex', href: '#/search?type=manga&sort=popular', items: f(feed.popular).map((i) => card(i)) })}
-    ${rail({ title: 'Latest updates', sub: 'Freshly uploaded chapters', href: '#/search?type=manga&sort=latest', items: f(feed.latest).map((i) => card(i)) })}
-    ${rail({ title: 'Top rated', href: '#/search?type=manga&sort=rating', items: f(feed.top).map((i) => card(i)) })}
     ${rail({ title: 'Manhwa', sub: 'Korean long-strip comics', href: '#/search?type=manga&origin=ko', items: f(feed.manhwa).map((i) => card(i)) })}
     ${rail({ title: 'Manhua', sub: 'Chinese comics', href: '#/search?type=manga&origin=zh', items: f(feed.manhua).map((i) => card(i)) })}
     ${rail({ title: 'Newly added', href: '#/search?type=manga&sort=new', items: f(feed.fresh).map((i) => card(i)) })}

@@ -31,14 +31,14 @@ export function showUpdateWindow({ force = false } = {}) {
   </div><section class="update-window" role="dialog" aria-modal="true" aria-labelledby="update-title" aria-describedby="update-intro">
     <div class="update-effects" aria-hidden="true"><span></span><i></i></div>
     <div class="update-topline" aria-hidden="true"><span>NULLX / SYSTEM</span><span>● &nbsp;ONLINE</span></div>
-    <div class="update-sigil" aria-hidden="true"><span>✦</span></div>
+    <div class="update-sigil" aria-hidden="true"><img src="assets/icon-192.png" alt=""><span>✦</span></div>
     <div class="update-ornament" aria-hidden="true">◆ &nbsp; SYSTEM MESSAGE &nbsp; ◆</div>
     <h2 id="update-title" data-glitch="UPDATE COMPLETE">UPDATE COMPLETE</h2>
     <p class="update-subtitle" id="update-intro">${RELEASE.title}</p>
     <div class="update-divider" aria-hidden="true"><span>◆</span></div>
     <div class="update-log-label" aria-hidden="true"><span>RELEASE LOG</span><span>NEW DATA ACQUIRED</span></div>
     <ul class="update-changes">${RELEASE.changes.map((change) => html`<li>${change}</li>`)}</ul>
-    <button class="update-ok" type="button"><span>OK</span><span aria-hidden="true">›</span></button>
+    <button class="update-ok" type="button"><span>Continue exploring</span><span aria-hidden="true">›</span></button>
     <div class="update-foot" aria-hidden="true"><span>◆ &nbsp; NULLXANIME</span><span>STATUS: UPDATED</span></div>
   </section>`.toString();
   $('#overlay-root').appendChild(el);
@@ -68,7 +68,8 @@ export function notifyUpdateReady(applyUpdate = () => location.reload()) {
   el.id = 'update-ready';
   el.className = 'update-ready';
   el.setAttribute('role', 'status');
-  el.innerHTML = html`<span>A new update is ready.</span><button type="button">Reload to see what changed</button>`.toString();
-  $('button', el).addEventListener('click', applyUpdate);
+  el.innerHTML = html`<span class="update-ready-icon" aria-hidden="true">✦</span><span><b>A new update is ready</b><small>Your reading or playback won't be interrupted.</small></span><button type="button" data-apply>Update now</button><button type="button" data-dismiss aria-label="Dismiss update notification">×</button>`.toString();
+  $('[data-apply]', el).addEventListener('click', applyUpdate);
+  $('[data-dismiss]', el).addEventListener('click', () => el.remove());
   document.body.appendChild(el);
 }

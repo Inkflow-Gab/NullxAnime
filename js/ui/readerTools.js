@@ -13,6 +13,7 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
     <div class="reader-panel-head"><div><b>Make it yours</b><small>Comfortable reading, your way.</small></div><button type="button" id="reader-close" aria-label="Close reader settings">${icon('x')}</button></div>
     <fieldset><legend>Reading layout</legend><div class="reader-choices" id="reader-layout">${[['vertical', 'Long strip'], ['ltr', 'Pages →'], ['rtl', '← Pages']].map(([id, label]) => html`<button type="button" data-reader-mode="${id}">${label}</button>`)}</div></fieldset>
     <fieldset><legend>Page fit</legend><div class="reader-choices" id="reader-fit">${[['width', 'Width'], ['height', 'Height'], ['original', 'Original']].map(([id, label]) => html`<button type="button" data-reader-fit="${id}">${label}</button>`)}</div></fieldset>
+    ${options.setDataSaver ? html`<label class="reader-saver"><input id="reader-saver" type="checkbox" ${getSettings().readerDataSaver ? 'checked' : ''}> Data saver (smaller images)</label>` : ''}
     <label for="reader-width">Page width <output id="reader-width-value"></output></label>
     <input id="reader-width" type="range" min="50" max="100" step="5" aria-label="Page width in fit-width mode"><small>In width fit mode.</small>
     <label for="reader-gap">Space between pages <output id="reader-gap-value"></output></label><input id="reader-gap" type="range" min="0" max="40" step="5">
@@ -23,9 +24,8 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
   const dock = document.createElement('div');
   dock.className = 'reader-dock';
   dock.setAttribute('role', 'toolbar'); dock.setAttribute('aria-label', 'Reading controls');
-  dock.innerHTML = html`<button type="button" data-reader-prev aria-label="Previous page">${icon('chevL')}</button><button type="button" data-reader-auto aria-label="Start auto-scroll" aria-pressed="false">${icon('play')}</button><button type="button" data-reader-count aria-label="Jump to a page">1 / ${pageCount}</button><button type="button" data-reader-next aria-label="Next page">${icon('chevR')}</button><button type="button" data-reader-settings aria-label="Reader settings">${icon('settings')}</button><button type="button" data-reader-full aria-label="Enter fullscreen">${icon('fullscreen')}</button>`.toString();
+  dock.innerHTML = html`<button type="button" data-reader-prev aria-label="Previous page">${icon('chevL')}</button><button type="button" data-reader-auto aria-label="Start auto-scroll" aria-pressed="false">${icon('play')}</button><button type="button" data-reader-count aria-label="Jump to a page">1 / ${pageCount}</button><button type="button" data-reader-next aria-label="Next page">${icon('chevR')}</button><button type="button" data-reader-full aria-label="Enter fullscreen">${icon('fullscreen')}</button>`.toString();
   reader.append(box, dock);
-  const panel = box.querySelector('.reader-tools-panel');
   const width = box.querySelector('#reader-width'), gap = box.querySelector('#reader-gap'), speed = box.querySelector('#reader-speed');
   const dockCount = dock.querySelector('[data-reader-count]'), autoButton = dock.querySelector('[data-reader-auto]');
   let current = 0, raf = 0, last = 0, running = false, scrollQueued = false;
@@ -71,6 +71,7 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
     else if (mode() === 'vertical') wrappers()[current]?.scrollIntoView({ block: 'start', behavior: 'instant' });
     else { wrappers().forEach((el, i) => el.classList.toggle('reader-current', i === current)); window.scrollTo(0, 0); }
     updateCount();
+    if (sourceReader && mode() !== 'vertical' && current === pageCount - 1) checkComplete();
   };
   const stopAuto = () => { running = false; cancelAnimationFrame(raf); last = 0; autoButton.setAttribute('aria-pressed', 'false'); autoButton.setAttribute('aria-label', 'Start auto-scroll'); autoButton.innerHTML = icon('play').toString(); };
   const tick = (time) => {
@@ -99,6 +100,7 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
     if (options.setMode) options.setMode(nextMode); else reader.dataset.mode = nextMode;
     applyChoices(); goPage(current);
   });
+  box.querySelector('#reader-saver')?.addEventListener('change', (event) => options.setDataSaver(event.target.checked));
   box.querySelector('#reader-fit').addEventListener('click', (event) => {
     const button = event.target.closest('[data-reader-fit]'); if (!button) return;
     setSetting('readerFit', button.dataset.readerFit); reader.dataset.fit = button.dataset.readerFit;
@@ -125,7 +127,6 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
   dock.querySelector('[data-reader-prev]').addEventListener('click', () => { stopAuto(); goPage(current - 1); });
   dock.querySelector('[data-reader-next]').addEventListener('click', () => { stopAuto(); goPage(current + 1); });
   autoButton.addEventListener('click', startAuto);
-  dock.querySelector('[data-reader-settings]').addEventListener('click', () => { box.open = !box.open; });
   dockCount.addEventListener('click', () => { box.open = true; box.querySelector('#reader-page').value = current + 1; box.querySelector('#reader-page').focus(); });
   box.querySelector('#reader-close').addEventListener('click', () => { box.open = false; box.querySelector('summary').focus(); });
   const onKey = (e) => {
@@ -133,6 +134,16 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
     if (!sourceReader || mode() === 'vertical' || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.target.tagName)) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); goPage(current + ((e.key === 'ArrowRight') === (mode() === 'ltr') ? 1 : -1)); }
   };
+  let endVisible = false;
+  const checkComplete = () => {
+    if (!options.onComplete || !sourceReader) return;
+    const lastPage = wrappers().at(-1)?.querySelector('img.rpage');
+    if (lastPage?.complete && lastPage.naturalWidth > 0 && ((mode() === 'vertical' && endVisible) || (mode() !== 'vertical' && current === pageCount - 1))) options.onComplete();
+  };
+  const onImageLoad = (event) => { if (event.target.matches?.('img.rpage')) checkComplete(); };
+  reader.addEventListener('load', onImageLoad, true);
+  const endObserver = sourceReader && options.onComplete ? new IntersectionObserver((entries) => { endVisible = entries.some((entry) => entry.isIntersecting); checkComplete(); }, { threshold: .1 }) : null;
+  const end = reader.querySelector('.reader-end'); if (end && endObserver) endObserver.observe(end);
   const onPageTap = (event) => {
     if (!sourceReader || mode() === 'vertical' || !event.target.matches('.rpage:not(.failed)')) return;
     const x = event.clientX / window.innerWidth;
@@ -146,5 +157,5 @@ export function attachReaderTools(ctx, reader, pageCount, jump, options = {}) {
   window.addEventListener('scroll', onScroll, { passive: true }); document.addEventListener('fullscreenchange', syncFull); document.addEventListener('keydown', onKey, true);
   if (sourceReader) { const saved = getSettings(); reader.dataset.mode = ['vertical', 'ltr', 'rtl'].includes(saved.readerMode) ? saved.readerMode : 'vertical'; reader.dataset.fit = ['width', 'height', 'original'].includes(saved.readerFit) ? saved.readerFit : 'width'; if (mode() !== 'vertical') goPage(0); }
   applyChoices(); updateCount();
-  ctx.cleanup(() => { stopAuto(); observer.disconnect(); reader.removeEventListener('click', onPageTap); window.removeEventListener('scroll', onScroll); document.removeEventListener('fullscreenchange', syncFull); document.removeEventListener('keydown', onKey, true); box.remove(); dock.remove(); });
+  ctx.cleanup(() => { stopAuto(); observer.disconnect(); endObserver?.disconnect(); reader.removeEventListener('load', onImageLoad, true); reader.removeEventListener('click', onPageTap); window.removeEventListener('scroll', onScroll); document.removeEventListener('fullscreenchange', syncFull); document.removeEventListener('keydown', onKey, true); box.remove(); dock.remove(); });
 }

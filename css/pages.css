@@ -517,3 +517,46 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 @media (max-width: 500px) { .comic-detail .asura-detail { grid-template-columns: 100px minmax(0, 1fr); gap: 14px; padding: 14px; } .comic-detail .page-title { font-size: 23px; } }
 /* A transformed app shell would trap fixed reader controls at the end of a long chapter. */
 body.reading .app { animation: none; transform: none; }
+
+/* Manga discovery: generous hierarchy and robust long-title wrapping. */
+.manga-welcome { padding: clamp(22px, 4vw, 50px) 0 5px; }
+.manga-welcome > span, .profile-kicker { color: #c9aaff; font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.manga-welcome h1 { font-size: clamp(32px, 5vw, 56px); letter-spacing: -.045em; line-height: 1.08; margin: 8px 0; }
+.manga-welcome p { color: var(--muted); }
+.manga-home .section-head h2 { letter-spacing: -.02em; }
+.card .title, .card .sub, .mhero-text h1, .reader-title b, .profile-intro h1 { overflow-wrap: anywhere; word-break: normal; min-width: 0; }
+.reader-title b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mhero-text { min-width: 0; }
+.reader-saver { display: flex; align-items: center; gap: 8px; }
+.reader-saver input { accent-color: var(--accent); }
+
+/* Local profile */
+.profile-page { max-width: 1120px; }
+.profile-banner { display: flex; align-items: center; gap: clamp(20px, 5vw, 46px); padding: clamp(26px, 5vw, 56px); border: 1px solid #ae87ed55; border-radius: 24px; background: radial-gradient(ellipse at 16% 45%, #783ed966, transparent 38%), linear-gradient(120deg, #1a1032, #0d1121); overflow: hidden; }
+.profile-orbit { position: relative; flex: none; width: clamp(96px, 15vw, 160px); aspect-ratio: 1; display: grid; place-items: center; }
+.profile-orbit::before, .profile-orbit::after { content: ''; position: absolute; inset: -5px; border: 1px solid #b890ff88; border-radius: 42%; }
+.profile-orbit::after { inset: -13px; border-style: dashed; border-radius: 50%; opacity: .45; }
+.profile-orbit img { width: 100%; height: 100%; border-radius: 22%; object-fit: cover; }
+.profile-intro { min-width: 0; }
+.profile-intro h1 { margin: 9px 0 3px; font-size: clamp(30px, 5vw, 52px); line-height: 1.05; color: #fff; }
+.profile-intro p { color: #d4baff; margin: 0 0 14px; font-size: 17px; }
+.profile-level { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid #cda6ff88; border-radius: 99px; color: #f5edff; font-size: 13px; font-weight: 700; }
+.profile-level svg, .profile-stat-grid svg, .profile-note > svg { width: 18px; height: 18px; }
+.profile-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin: 20px 0; }
+.profile-card { min-width: 0; padding: clamp(20px, 3vw, 30px); border: 1px solid var(--line); border-radius: 20px; background: var(--surface, #171724); }
+.profile-card h2 { margin: 8px 0 16px; font-size: 22px; }
+.profile-card h3 { margin: 18px 0 8px; }
+.profile-card p { color: var(--muted); line-height: 1.6; }
+.profile-card hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
+.profile-card-head { display: flex; justify-content: space-between; gap: 15px; align-items: center; }
+.profile-card-head strong { color: var(--accent); font-size: 22px; white-space: nowrap; }
+.profile-card-head strong span { opacity: .6; }
+.profile-meter { height: 10px; border-radius: 99px; background: #7774; overflow: hidden; }
+.profile-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8755ed, #e48aff); }
+.profile-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 22px; }
+.profile-stat-grid div { display: grid; gap: 6px; padding: 15px; min-width: 0; background: #a886ff12; border-radius: 14px; }
+.profile-stat-grid svg { color: #bca1ff; }.profile-stat-grid b { font-size: 23px; }.profile-stat-grid small { color: var(--muted); }
+.profile-name-row { display: flex; gap: 8px; }.profile-name-row input { flex: 1; min-width: 0; }
+.profile-note { display: flex; align-items: flex-start; gap: 12px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; }.profile-note > svg { flex: none; color: var(--accent); }.profile-note p { color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }.profile-note a { color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }.profile-note a svg { width: 16px; }
+@media (max-width: 700px) { .profile-grid { grid-template-columns: 1fr; }.profile-banner { padding: 24px 20px; }.profile-stat-grid div { padding: 11px; }.profile-note code { font-size: 11px; } }
+.manga-home .card .title { display: block; overflow: visible; }

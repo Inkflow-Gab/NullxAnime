@@ -148,7 +148,7 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A reader made for you') &&
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Your story, your journey') &&
         dialog.textContent.includes('Provider availability') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
@@ -575,6 +575,14 @@ try {
     return !!hasAsura && original.length === 1 && original[0] === '#/asura/mock-series/1' && chapters.length === 1 && chapters[0] === '#/scans/vortex/mock-iken/1' && noFire;
   })());
   check('manga home', await visit('/manga', '.mhero-slide.active', { shot: 'manga' }) && (await count('.rail .card')) > 30);
+  check('manga discovery ranks trending, new, upcoming and top in order', await (async () => {
+    await page.waitForFunction(() => document.querySelector('#manga-trending')?.textContent.includes('Trending now') && document.querySelector('#manga-upcoming')?.textContent.includes('Upcoming releases'), { timeout: 8000 });
+    return await page.evaluate(() => {
+      const ids = ['manga-trending', 'manga-releases', 'manga-upcoming', 'manga-top'];
+      const nodes = ids.map((id) => document.getElementById(id));
+      return nodes.every((n, i) => i === 0 || !!(nodes[i - 1].compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)) && nodes[0].textContent.includes('AniList') && nodes[1].textContent.includes('New releases') && nodes[2].textContent.includes('chapters may not be available') && nodes[3].textContent.includes('Top rated');
+    });
+  })());
   check('manga carousel loads other slides on demand', await (async () => {
     const before = await page.$$eval('.mhero-slide:not(.active) img[data-hero-src]', (imgs) => imgs.length);
     await page.$eval('#mhero [data-dot="1"]', (e) => e.click());
@@ -592,6 +600,21 @@ try {
     const images = await page.$$eval('.reader .rpage', (imgs) => imgs.map((img) => img.getAttribute('src')));
     const lazy = await page.$$eval('.reader .rpage', (imgs) => imgs.at(-1)?.getAttribute('loading'));
     return chapterLinks.length === 1 && chapterLinks[0] === '#/asura/mock-series/1' && images.length === 3 && images[0].startsWith('https://cdn.asurascans.com/asura-images/') && lazy === 'lazy';
+  })());
+  check('source reader records a chapter only after a loaded last page', await (async () => {
+    await page.evaluate(async () => (await import('./js/store.js')).toggleMark('manga', 'asura:mock-series', '1', false));
+    await visit('/asura/mock-series/1', '.reader-tools', { timeout: 10000 });
+    await page.$eval('.reader-tools summary', (e) => e.click());
+    await page.$eval('[data-reader-mode="ltr"]', (e) => e.click());
+    await page.$eval('[data-reader-next]', (e) => e.click());
+    await page.$eval('[data-reader-next]', (e) => e.click());
+    await page.waitForFunction(async () => (await import('./js/store.js')).getMarks('manga', 'asura:mock-series').has('1'), { timeout: 5000 });
+    return await page.evaluate(async () => {
+      const s = await import('./js/store.js'), p = await import('./js/profile.js'), before = p.getProfile().xp;
+      s.toggleMark('manga', 'asura:mock-series', '1', false); s.toggleMark('manga', 'asura:mock-series', '1', true);
+      s.setSetting('readerMode', 'vertical');
+      return p.getProfile().xp === before;
+    });
   })());
   check('scan reader history works even when MangaDex is blocked', await (async () => {
     blockMangaDex = true;
@@ -768,6 +791,7 @@ try {
   })());
   check('reader tools change width and jump to a page', await (async () => {
     await visit('/read/00000000-0000-4000-8000-000000000000/11111111-0000-4000-8000-000000000001', '.reader .rwrap');
+    const oneSettings = await page.$$eval('[aria-label="Open reader settings"], #rset, [data-reader-settings]', (els) => els.length === 1) && !!(await page.$('#reader-saver'));
     await page.$eval('.reader-tools summary', (e) => e.click());
     await page.$eval('#reader-width', (e) => { e.value = '70'; e.dispatchEvent(new Event('input', { bubbles: true })); });
     await page.$eval('#reader-page', (e) => { e.value = '3'; });
@@ -782,7 +806,7 @@ try {
     const scan = await page.$eval('.reader', (e) => e.style.getPropertyValue('--reader-page-width') === '70%');
     await visit('/asura/mock-series/1', '.reader', { timeout: 10000 });
     const asura = !!(await page.$('.reader-tools'));
-    return width && paged && scan && asura;
+    return oneSettings && width && paged && scan && asura;
   })());
 
   check('reader dock layouts and controls work across source readers', await (async () => {
@@ -937,11 +961,36 @@ try {
     await page.click('.comic-diagnostic summary');
     await page.$eval('#comic-check', (el) => el.scrollIntoView({ block: 'center' }));
     await new Promise((r) => setTimeout(r, 500));
-    await page.click('#comic-check');
-    try { await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length >= 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'), { timeout: 12000 }); } catch (error) { console.error('Diagnostic state:', await page.$eval('#comic-check-results', (el) => el.textContent)); throw error; }
+    // Provider responses can reflow the grid while it loads; activate the intended control.
+    await page.$eval('#comic-check', (el) => el.click());
+    try { await page.waitForFunction(() => document.querySelectorAll('#comic-check-results li').length >= 5 && !document.querySelector('#comic-check-results').textContent.includes('Checking…'), { timeout: 12000 }); } catch (error) { console.error('Diagnostic state:', await page.evaluate(() => ({ hash: location.hash, text: document.querySelector('#comic-check-results')?.textContent, app: document.querySelector('#app')?.textContent.slice(0, 300) }))); throw error; }
     return await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && !!document.querySelector('#comic-sort a.on') && !document.querySelector('#comic-check').disabled);
   })());
   check('small phone scan reader stays within viewport', await visit('/scans/vortex/mock-iken/1', '.reader .rpage', { timeout: 10000 }) && await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+
+  check('profile tracks completions once and shows a private local identity', await (async () => {
+    await visit('/profile', '.profile-page');
+    return await page.evaluate(async () => {
+      const store = await import('./js/store.js'); const profile = await import('./js/profile.js');
+      const before = profile.getProfile();
+      store.toggleMark('anime', 'test-profile-item', 987654, true);
+      store.toggleMark('anime', 'test-profile-item', 987654, false);
+      store.toggleMark('anime', 'test-profile-item', 987654, true);
+      const after = profile.getProfile(), backup = store.exportAll();
+      return after.xp === before.xp + 20 && after.id === before.id && !('id' in backup.profile) && document.querySelector('.profile-note').textContent.includes('not a hardware ID');
+    });
+  })());
+  check('level-up notice is non-blocking and dismissible', await (async () => {
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('nx:level-up', { detail: { level: 8, title: 'Page Seeker' } })));
+    const shown = await page.$eval('.level-notice', (el) => el.getAttribute('role') === 'status' && el.textContent.includes('Level 8 unlocked') && el.textContent.includes('Page Seeker'));
+    await page.$eval('.level-notice button', (el) => el.click());
+    return shown && !(await page.$('.level-notice'));
+  })());
+  check('profile name is saved and rendered safely', await (async () => {
+    await page.$eval('#profile-name', (el) => { el.value = '<img src=x onerror=alert(1)>'; });
+    await page.$eval('#profile-name-form', (el) => el.requestSubmit());
+    return await page.$eval('.profile-intro h1', (el) => el.textContent.includes('<img') && !el.querySelector('img'));
+  })());
 
   check('no uncaught JS / console errors', errors.length === 0, `\n    ${errors.slice(0, 6).join('\n    ')}`);
   failed = results.filter((r) => !r.ok).length;

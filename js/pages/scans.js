@@ -3,7 +3,7 @@ import { attachReaderTools } from '../ui/readerTools.js';
 import { html, $, cleanAniHtml } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { sourceOf, scansSearch, scansDetails, scansChapters, scansPages } from '../api/scans.js';
-import { getSettings, pushHistory } from '../store.js';
+import { getSettings, pushHistory, toggleMark } from '../store.js';
 import { skelGrid, errorBox, emptyBox, PLACEHOLDER } from '../ui/components.js';
 import { go } from '../router.js';
 
@@ -65,7 +65,7 @@ async function read(ctx, source, config, slug, chapter) {
     document.body.classList.add('reading');
     ctx.cleanup(() => document.body.classList.remove('reading'));
     ctx.render(html`<div class="reader" data-mode="vertical" data-fit="width"><header class="reader-bar"><a class="icon-btn" href="#/scans/${source}/${slug}" aria-label="Back to chapters">${icon('chevL')}</a><div class="reader-title"><b>${m.title}</b><small>${config.label} · ${current.label}</small></div><div class="spacer"></div>${prev ? html`<a class="btn sm" href="#/scans/${source}/${slug}/${prev.id}">Previous</a>` : ''}${next ? html`<a class="btn sm primary" href="#/scans/${source}/${slug}/${next.id}">Next</a>` : ''}</header><div class="reader-view vertical">${pages.map((url, i) => html`<div class="rwrap"><img class="rpage" src="${url}" alt="Page ${i + 1}" ${i > 1 ? html`loading="lazy"` : ''} decoding="async" referrerpolicy="no-referrer"></div>`)}<div class="reader-end"><h3>${current.label} finished</h3><div class="row" style="justify-content:center"><a class="btn" href="#/scans/${source}/${slug}">Chapters</a>${next ? html`<a class="btn primary" href="#/scans/${source}/${slug}/${next.id}">Next chapter</a>` : ''}</div></div></div></div>`);
-    attachReaderTools(ctx, ctx.el.querySelector('.reader'), pages.length);
+    attachReaderTools(ctx, ctx.el.querySelector('.reader'), pages.length, null, { onComplete: () => toggleMark('manga', `${source}:${slug}`, chapter, true) });
     ctx.el.querySelectorAll('.rpage').forEach((img, i) => img.addEventListener('error', () => {
       if (!img.parentElement || !ctx.alive()) return;
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'rpage failed';
