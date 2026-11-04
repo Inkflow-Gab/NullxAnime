@@ -4,7 +4,7 @@ import { attachReaderTools } from '../ui/readerTools.js';
 import { html, render, $, $$, on, clamp, esc } from '../util.js';
 import { icon } from '../ui/icons.js';
 import { chapterInfo, chapterFeed, chapterPages, mangaDetail } from '../api/mangadex.js';
-import { fromManga, toast, errorBox, popover, closePopover } from '../ui/components.js';
+import { fromManga, toast, errorBox } from '../ui/components.js';
 import { getSettings, setSetting, pushHistory, toggleMark, getEntry, saveEntry, getPos, setPos, getMarks, isAdultRating } from '../store.js';
 import { go } from '../router.js';
 
@@ -57,7 +57,6 @@ export default async function reader(ctx) {
         <button data-mode="ltr" title="Left to right">${icon('ltr')}</button>
         <button data-mode="rtl" title="Right to left (manga)">${icon('rtl')}</button>
       </div>
-      <button class="icon-btn" id="rset" aria-label="Reader settings" data-pop>${icon('settings')}</button>
       <button class="icon-btn" id="rfull" aria-label="Fullscreen">${icon('fullscreen')}</button>
     </header>
     <div class="reader-view" id="rv"></div>
@@ -78,7 +77,7 @@ export default async function reader(ctx) {
   const markRead = () => {
     if (finished) return; finished = true;
     toggleMark('manga', id, chapterId, true);
-    if (cur.id !== chapterId) toggleMark('manga', id, cur.id, true);
+    if (cur.id !== chapterId) toggleMark('manga', id, cur.id, true, { award: false });
     const e = getEntry('manga', id);
     const n = Math.floor(parseFloat(cur.chapter));
     const readCount = getMarks('manga', id).size;
@@ -211,25 +210,14 @@ export default async function reader(ctx) {
   $('#rfull').addEventListener('click', toggleFull);
   $('#chsel').addEventListener('change', (e) => go(`/read/${id}/${e.target.value}`));
   $('#modes').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) { setSetting('readerMode', b.dataset.mode); mount(); } });
-  $('#rset').addEventListener('click', (e) => {
-    const cur_ = getSettings();
-    const el = popover(e.currentTarget, html`<div class="ph">Fit</div>
-      ${[['width', 'Fit width'], ['height', 'Fit height'], ['original', 'Original size']].map(([v, l]) => html`<button data-fit="${v}" class="${cur_.readerFit === v ? 'on' : ''}">${icon(cur_.readerFit === v ? 'check' : 'eye')} ${l}</button>`)}
-      <hr><button data-saver class="${cur_.readerDataSaver ? 'on' : ''}">${icon(cur_.readerDataSaver ? 'check' : 'download')} Data saver (smaller images)</button>`);
-    el.addEventListener('click', async (ev) => {
-      const f = ev.target.closest('[data-fit]'), d = ev.target.closest('[data-saver]');
-      if (f) { setSetting('readerFit', f.dataset.fit); mount(); closePopover(); }
-      if (d) {
-        setSetting('readerDataSaver', !getSettings().readerDataSaver); closePopover();
-        try { pages = await chapterPages(chapterId, getSettings().readerDataSaver); mount(); toast(getSettings().readerDataSaver ? 'Data saver on' : 'Data saver off'); } catch (err) { toast(err.message, 'err'); }
-      }
-    });
-  });
   ctx.cleanup(() => cleanups.forEach((fn) => fn()));
   ctx.cleanup(() => io?.disconnect());
   mount();
   attachReaderTools(ctx, rd, pages.length, (index) => {
     if (s.readerMode === 'vertical') rv.querySelector(`.rwrap[data-i="${index}"]`)?.scrollIntoView({ block: 'start' });
     else show(index);
-  }, { setMode: () => mount(), setFit: () => { s = getSettings(); } });
+  }, { setMode: () => mount(), setFit: () => { s = getSettings(); }, setDataSaver: async (enabled) => {
+    try { const nextPages = await chapterPages(chapterId, enabled); if (!ctx.alive()) return; setSetting('readerDataSaver', enabled); pages = nextPages; mount(); toast(enabled ? 'Data saver on' : 'Data saver off'); }
+    catch (err) { if (!ctx.alive()) return; const input = $('#reader-saver', rd); if (input) input.checked = !enabled; toast(err.message, 'err'); }
+  } });
 }

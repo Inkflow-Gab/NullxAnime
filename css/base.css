@@ -261,3 +261,21 @@ html[data-performance="off"] .topbar .brand img { animation: brand-flourish 1.2s
 html[data-performance="off"] .brand:hover img, html[data-performance="off"] .brand:focus-visible img { animation: brand-flourish .7s var(--ease) both; }
 @media (prefers-reduced-motion: reduce) { html .brand img { animation: none !important; } }
 html.reduce-motion .brand img { animation: none !important; }
+
+/* The in-app emblem has independent orbit, glint and light layers. Installed OS icons are static PNGs. */
+.brand-emblem { position: relative; display: grid; place-items: center; flex: none; isolation: isolate; }
+.brand-emblem img { display: block; position: relative; z-index: 1; }
+.brand-emblem::before, .brand-emblem::after, .brand-emblem i, .brand-emblem em { content: ''; position: absolute; pointer-events: none; }
+.brand-emblem::before { inset: -3px; border: 1px solid #c9a7ff99; border-radius: 35%; }
+.brand-emblem::after { inset: -5px; border: 1px dashed #b79bff77; border-radius: 50%; }
+.brand-emblem i { width: 5px; height: 5px; top: -3px; left: 50%; background: #fff; border-radius: 50%; box-shadow: 0 0 8px 3px #c79bff; z-index: 2; transform-origin: 0 24px; }
+.brand-emblem em { inset: 4px; border-radius: 50%; background: radial-gradient(circle, #fff6, transparent 65%); mix-blend-mode: screen; z-index: 2; opacity: .15; }
+@keyframes emblem-orbit { to { transform: rotate(360deg); } }
+@keyframes emblem-orbit-reverse { to { transform: rotate(-360deg); } }
+@keyframes emblem-glint { 0%, 100% { opacity: .12; } 46% { opacity: .65; } 52% { opacity: .15; } }
+html[data-performance="off"] .brand-emblem::before { animation: emblem-orbit 12s linear infinite; }
+html[data-performance="off"] .brand-emblem::after { animation: emblem-orbit-reverse 20s linear infinite; }
+html[data-performance="off"] .brand-emblem i { animation: emblem-orbit 6s linear infinite; }
+html[data-performance="off"] .brand-emblem em { animation: emblem-glint 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { html .brand-emblem::before, html .brand-emblem::after, html .brand-emblem i, html .brand-emblem em { animation: none !important; } }
+html.reduce-motion .brand-emblem::before, html.reduce-motion .brand-emblem::after, html.reduce-motion .brand-emblem i, html.reduce-motion .brand-emblem em { animation: none !important; }

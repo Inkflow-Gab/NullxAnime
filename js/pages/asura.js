@@ -5,7 +5,7 @@ import { icon } from '../ui/icons.js';
 import { asuraSearch, asuraDetails, asuraChapters, asuraPages } from '../api/asura.js';
 import { skelGrid, errorBox, emptyBox, PLACEHOLDER } from '../ui/components.js';
 import { go } from '../router.js';
-import { pushHistory } from '../store.js';
+import { pushHistory, toggleMark } from '../store.js';
 
 export default async function asura(ctx) {
   const { slug, chapter } = ctx.params;
@@ -60,7 +60,7 @@ async function read(ctx, slug, chapter) {
     ctx.cleanup(() => document.body.classList.remove('reading'));
     ctx.render(html`<div class="reader" data-mode="vertical" data-fit="width"><header class="reader-bar"><a class="icon-btn" href="#/asura/${slug}" aria-label="Back to chapters">${icon('chevL')}</a><div class="reader-title"><b>${m.title}</b><small>Asura · Chapter ${chapter}</small></div><div class="spacer"></div>${prev ? html`<a class="btn sm" href="#/asura/${slug}/${prev.number}">Previous</a>` : ''}${next ? html`<a class="btn sm primary" href="#/asura/${slug}/${next.number}">Next</a>` : ''}</header><div class="reader-view vertical">${pages.map((url, i) => html`<div class="rwrap"><img class="rpage" src="${url}" alt="Page ${i + 1}" ${i > 1 ? html`loading="lazy"` : ''} decoding="async" referrerpolicy="no-referrer"></div>`)}<div class="reader-end"><h3>Chapter ${chapter} finished</h3><div class="row" style="justify-content:center"><a class="btn" href="#/asura/${slug}">Chapters</a>${next ? html`<a class="btn primary" href="#/asura/${slug}/${next.number}">Next chapter</a>` : ''}</div></div></div></div>`);
     // Surface failed CDN images rather than silently leaving a blank page.
-    attachReaderTools(ctx, ctx.el.querySelector('.reader'), pages.length);
+    attachReaderTools(ctx, ctx.el.querySelector('.reader'), pages.length, null, { onComplete: () => toggleMark('manga', `asura:${slug}`, chapter, true) });
     ctx.el.querySelectorAll('.rpage').forEach((img, i) => {
       img.addEventListener('error', () => {
         const wrapper = img.parentElement;

@@ -8,8 +8,10 @@ import { openPalette, setPaletteType } from './ui/palette.js';
 import { startRouter, onRoute, go, reload } from './router.js';
 import { installTvNavigation } from './ui/tv.js';
 import { showUpdateWindow, notifyUpdateReady } from './ui/update.js';
+import { installLevelUpNotice } from './ui/levelUp.js';
 
 applySettings();
+installLevelUpNotice();
 bindGlobalUi();
 installTvNavigation();
 // Re-evaluate local device hints when viewport/input changes (e.g. rotation).
@@ -28,11 +30,12 @@ const NAV = [
 function drawShell() {
   const navItems = getSettings().adultManga === true ? [...NAV.slice(0, 2), ['adult', 'Hentai', '#/adult', 'film'], ...NAV.slice(2)] : NAV;
   render($('#topbar'), html`
-    <a class="brand" href="#/" aria-label="NullxAnime home"><img src="assets/icon-192.png" alt="" width="32" height="32"><span>Nullx<b>Anime</b></span></a>
+    <a class="brand" href="#/" aria-label="NullxAnime home"><span class="brand-emblem" aria-hidden="true"><img src="assets/icon-192.png" alt="" width="32" height="32"><i></i><em></em></span><span>Nullx<b>Anime</b></span></a>
     <nav class="nav" aria-label="Main">${navItems.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${label}</a>`)}</nav>
     <div class="topbar-spacer"></div>
     <div class="top-actions">
       <button class="search-trigger" data-action="search" aria-label="Search">${icon('search')}<span>Search anime &amp; manga</span><kbd>/</kbd></button>
+      <a class="icon-btn profile-nav" href="#/profile" aria-label="My profile" title="My profile">${icon('user')}</a>
       <a class="icon-btn" href="#/settings" aria-label="Settings" title="Settings">${icon('settings')}</a>
     </div>`);
   render($('#tabbar'), navItems.map(([k, label, href, ic]) => html`<a href="${href}" data-nav="${k}">${icon(ic)}<span>${label === 'My List' ? 'List' : label}</span></a>`));
@@ -40,7 +43,7 @@ function drawShell() {
     <div><a class="brand" href="#/" style="margin-bottom:10px"><img src="assets/icon-192.png" alt="" width="28" height="28"><span>Nullx<b>Anime</b></span></a>
       <p>Your anime &amp; manga universe. No account needed; your list lives in your browser. Third-party players may contain ads.</p></div>
     <div><h4>Explore</h4><ul><li><a href="#/">Anime home</a></li><li><a href="#/manga">Manga home</a></li><li><a href="#/releases">Recent episodes</a></li><li><a href="#/search?type=anime">Browse anime</a></li><li><a href="#/search?type=manga">Browse manga</a></li><li><a href="#/free">Free &amp; open library</a></li></ul></div>
-    <div><h4>More</h4><ul><li><a href="#/library">My list</a></li><li><a href="#/discover">Discover tools &amp; sites</a></li><li><a href="#/settings">Settings &amp; backup</a></li><li><a href="#/about">About &amp; legal</a></li><li><button class="link-btn" data-action="whats-new">What’s new</button></li><li><a href="https://github.com/Inkflow-Gab/NullxAnime" target="_blank" rel="noopener">GitHub</a></li></ul></div>
+    <div><h4>More</h4><ul><li><a href="#/library">My list</a></li><li><a href="#/discover">Discover tools &amp; sites</a></li><li><a href="#/profile">My profile</a></li><li><a href="#/settings">Settings &amp; backup</a></li><li><a href="#/about">About &amp; legal</a></li><li><button class="link-btn" data-action="whats-new">What’s new</button></li><li><a href="https://github.com/Inkflow-Gab/NullxAnime" target="_blank" rel="noopener">GitHub</a></li></ul></div>
     <div class="dev-signature" aria-label="Developed by Gab"><span class="dev-label">Developed by</span><span class="dev-name" data-text="Gab">Gab</span><span class="dev-star" aria-hidden="true">✦</span></div>
     <p class="fine">NullxAnime does not host any video or manga files. Metadata comes from <a href="https://anilist.co" target="_blank" rel="noopener">AniList</a>, manga from <a href="https://mangadex.org" target="_blank" rel="noopener">MangaDex</a> and open video from the <a href="https://archive.org" target="_blank" rel="noopener">Internet Archive</a>. All trademarks and artwork belong to their respective owners. Please support the creators through official releases.</p>
   </div>`);

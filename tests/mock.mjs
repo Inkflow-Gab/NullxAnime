@@ -96,6 +96,7 @@ export function anilist(body) {
     const q = (variables.search || '').toLowerCase();
     const adult = query.includes('isAdult: true');
     let items = (adult ? [media(99 + (variables.page - 1), { isAdult: true, format: 'OVA', status: 'FINISHED', genres: ['Fantasy', 'Romance'] })] : many(20)).filter((m) => !q || `${m.title.romaji} ${m.title.english}`.toLowerCase().includes(q));
+    if (variables.type === 'MANGA' && !adult) items = items.map((m) => ({ ...m, type: 'MANGA', format: 'MANGA', status: variables.status || 'RELEASING' }));
     if (variables.genre) items = items.filter((m) => m.genres.includes(variables.genre));
     if (variables.format) items = items.filter((m) => m.format === variables.format);
     if (variables.status) items = items.filter((m) => m.status === variables.status);

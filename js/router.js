@@ -25,6 +25,7 @@ const routes = [
   ['/schedule', () => import('./pages/schedule.js'), 'schedule'],
   ['/library', () => import('./pages/library.js'), 'library'],
   ['/discover', () => import('./pages/discover.js'), 'discover'],
+  ['/profile', () => import('./pages/profile.js'), 'profile'],
   ['/settings', () => import('./pages/settings.js'), 'settings'],
   ['/about', () => import('./pages/about.js'), 'discover'],
 ].map(([pattern, load, nav]) => ({

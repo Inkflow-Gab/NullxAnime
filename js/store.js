@@ -1,4 +1,5 @@
 import { currentDevice, useLightweightEffects } from './ui/device.js';
+import { recordCompletions, exportProfile, importProfile, resetProfile } from './profile.js';
 
 // Local-first persistence. Everything lives in the browser's localStorage under the `nx:` prefix,
 // so there are no accounts, no captcha and no server. Export / import JSON from Settings.
@@ -125,19 +126,22 @@ export const lastHistory = (type, id) => history.find((h) => h.type === type && 
 /* ---------------- Watched episodes / read chapters ------------------------------- */
 let marks = read('marks', {}); // { 'anime:123': [1,2,3], 'manga:uuid': ['chapterId',...] }
 export const getMarks = (type, id) => new Set(marks[libKey(type, id)] || []);
-export function toggleMark(type, id, value, force) {
+export function toggleMark(type, id, value, force, { award = true } = {}) {
   const k = libKey(type, id);
   const set = new Set(marks[k] || []);
   const has = set.has(value);
   const want = force == null ? !has : force;
   if (want) set.add(value); else set.delete(value);
   marks[k] = Array.from(set);
+  if (want && !has && award) recordCompletions(type, id, [value]);
   write('marks', marks);
   emit('marks', { type, id, value, on: want });
   return want;
 }
 export function setMarks(type, id, values) {
+  const previous = new Set(marks[libKey(type, id)] || []);
   marks[libKey(type, id)] = Array.from(values);
+  recordCompletions(type, id, marks[libKey(type, id)].filter((value) => !previous.has(value)));
   write('marks', marks);
   emit('marks', { type, id });
 }
@@ -178,6 +182,7 @@ const BACKUP_KEYS = ['settings', 'library', 'history', 'marks', 'positions', 'my
 export function exportAll() {
   const data = { app: 'NullxAnime', version: 1, exportedAt: new Date().toISOString() };
   for (const k of BACKUP_KEYS) data[k] = read(k, null);
+  data.profile = exportProfile();
   return data;
 }
 export function importAll(data, { merge = true } = {}) {
@@ -192,10 +197,19 @@ export function importAll(data, { merge = true } = {}) {
   }
   if (data.positions) { positions = merge ? { ...positions, ...data.positions } : data.positions; write('positions', positions); }
   if (data.mylinks) { myLinks = merge ? { ...myLinks, ...data.mylinks } : data.mylinks; write('mylinks', myLinks); }
+  if (data.profile) importProfile(data.profile, { merge });
+  else if (data.marks && typeof data.marks === 'object') {
+    // Older backups have marks but no XP ledger; restore them quietly.
+    for (const [key, values] of Object.entries(data.marks)) {
+      const split = key.indexOf(':');
+      if (split > 0 && Array.isArray(values)) recordCompletions(key.slice(0, split), key.slice(split + 1), values, { notify: false });
+    }
+  }
   emit('import', null);
 }
 export function wipeAll() {
   for (const k of BACKUP_KEYS) { try { localStorage.removeItem(P + k); } catch {} }
+  resetProfile();
   settings = { ...DEFAULT_SETTINGS }; library = {}; history = []; marks = {}; positions = {}; myLinks = {}; searches = [];
   applySettings();
   emit('import', null);
