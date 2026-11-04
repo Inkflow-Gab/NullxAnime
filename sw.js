@@ -1,6 +1,6 @@
 // A release is an immutable app shell. Never revalidate individual cached modules:
 // combining files from different releases can break JavaScript imports.
-const VERSION = 'nx-v19';
+const VERSION = 'nx-v20';
 const META = 'nullxanime-sw-meta';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',

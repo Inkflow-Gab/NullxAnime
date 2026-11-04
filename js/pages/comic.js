@@ -19,7 +19,7 @@ function rank(title, candidate) {
 export default async function comic(ctx) {
   const { source, slug } = ctx.params;
   if (source === 'mangadex' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)) { ctx.render(errorBox(new Error('Invalid MangaDex title.'))); return; }
-  if (!['asura', 'vortex', 'mangadex'].includes(source)) { ctx.render(errorBox(new Error('Unknown catalogue.'))); return; }
+  if (!['asura', 'vortex', 'mangadex', 'hive'].includes(source)) { ctx.render(errorBox(new Error('Unknown catalogue.'))); return; }
   ctx.render(html`<div class="container page">${skelGrid(3)}</div>`);
   let item;
   try { item = source === 'asura' ? await asuraDetails(slug) : source === 'mangadex' ? await mangaDetail(slug) : await scansDetails(source, slug);
@@ -32,7 +32,7 @@ export default async function comic(ctx) {
   }
   if (!ctx.alive()) return;
   ctx.setTitle(item.title);
-  ctx.render(html`<div class="container page"><a class="btn sm ghost" href="#/manga">${icon('chevL')} Manga &amp; manhwa</a><div class="asura-detail"><img class="asura-poster" src="${item.cover || PLACEHOLDER}" referrerpolicy="no-referrer" alt=""><div><div class="chips"><span class="badge accent">${item.type}</span>${item.status ? html`<span class="badge">${item.status}</span>` : ''}</div><h1 class="page-title">${item.title}</h1><div class="detail-desc">${cleanAniHtml(item.description)}</div></div></div><section class="section"><h2>Find chapters</h2><p class="muted">Choose a provider. Confirm the matching title before reading; chapter availability varies.</p><div class="chips comic-providers" id="comic-providers">${['asura', 'vortex', 'mangadex', 'hive'].map((p) => html`<button class="chip ${source === p ? 'active' : ''}" data-provider="${p}">${labels[p]}${p === 'hive' ? ' · experimental' : ''}</button>`)}<span class="chip" title="A browser-compatible chapter source is not available" aria-label="MangaFire unavailable">MangaFire · unavailable</span></div><p class="muted comic-help">MangaFire needs a compatible service; Hivetoons images may be blocked. No website is embedded.</p><form id="comic-match-search" class="filter-bar" hidden><label class="sr-only" for="comic-match-query">Provider search title</label><input class="input" id="comic-match-query" style="max-width:500px;flex:1" maxlength="150" placeholder="Try another title or spelling"><button class="btn">${icon('search')} Search provider</button></form><div id="comic-provider-results" aria-live="polite"></div></section></div>`);
+  ctx.render(html`<div class="container page comic-detail"><a class="btn sm ghost" href="#/manga">${icon('chevL')} Manga &amp; manhwa</a><div class="asura-detail"><img class="asura-poster" src="${item.cover || PLACEHOLDER}" referrerpolicy="no-referrer" alt=""><div><div class="chips"><span class="badge accent">${item.type}</span>${item.status ? html`<span class="badge">${item.status}</span>` : ''}</div><h1 class="page-title">${item.title}</h1><div class="detail-desc">${cleanAniHtml(item.description)}</div></div></div><section class="section"><h2>Find chapters</h2><p class="muted">Choose a provider. Confirm the matching title before reading; chapter availability varies.</p><div class="source-tabs tabs-scroll comic-providers" id="comic-providers" role="group" aria-label="Choose a chapter provider">${['asura', 'vortex', 'mangadex', 'hive'].map((p) => html`<button class="chip ${source === p ? 'active' : ''}" data-provider="${p}" aria-pressed="${source === p}">${labels[p]}${p === 'hive' ? ' · experimental' : ''}</button>`)}<span class="chip" title="A browser-compatible chapter source is not available" aria-label="MangaFire unavailable">MangaFire · unavailable</span></div><p class="muted comic-help">MangaFire needs a compatible service; Hivetoons images may be blocked. No website is embedded.</p><form id="comic-match-search" class="filter-bar" hidden><label class="sr-only" for="comic-match-query">Provider search title</label><input class="input" id="comic-match-query" style="max-width:500px;flex:1" maxlength="150" placeholder="Try another title or spelling"><button class="btn">${icon('search')} Search provider</button></form><div id="comic-provider-results" aria-live="polite"></div></section></div>`);
   const results = $('#comic-provider-results', ctx.el);
   let serial = 0, activeProvider = source;
   async function showChapters(provider, match, task) {
@@ -52,7 +52,7 @@ export default async function comic(ctx) {
     searchForm.hidden = provider === source;
     $('#comic-match-query', ctx.el).value = query;
     const task = ++serial;
-    ctx.el.querySelectorAll('[data-provider]').forEach((b) => b.classList.toggle('active', b.dataset.provider === provider));
+    ctx.el.querySelectorAll('[data-provider]').forEach((b) => { b.classList.toggle('active', b.dataset.provider === provider); b.setAttribute('aria-pressed', String(b.dataset.provider === provider)); });
     if (provider === source) { await showChapters(provider, item, task); return; }
     render(results, html`<p class="muted">Searching ${labels[provider]} for “${query}”…</p>`);
     try {

@@ -461,3 +461,59 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .hero-transport button svg { width: 16px; height: 16px; }
 .hero-transport #hero-count { min-width: 46px; text-align: center; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) { #hero .hero-transport { right: var(--gutter); bottom: 12px; } }
+
+/* Reader studio: a compact, touch-friendly dock with an optional settings sheet. */
+.reader-tools { z-index: 100; left: max(12px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); }
+.reader-tools > summary { display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border-radius: 15px; background: #211b30ed; box-shadow: 0 8px 26px #0008; }
+.reader-tools > summary svg { width: 19px; height: 19px; }
+.reader-tools > summary span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.reader-tools[open] > summary { color: #fff; background: #67509b; }
+.reader-tools-panel { position: fixed; left: max(12px, env(safe-area-inset-left)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 58px); width: min(370px, calc(100vw - 24px)); max-height: min(74dvh, 720px); padding: 20px; gap: 10px; color: #f5f1ff; background: linear-gradient(150deg, #272034f7, #13131df9); border: 1px solid #a68be34d; border-radius: 22px; box-shadow: 0 22px 70px #000b, 0 0 28px #9d6aff24; transform-origin: bottom left; animation: reader-sheet-in .28s var(--ease) both; }
+@keyframes reader-sheet-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+.reader-panel-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.reader-panel-head b { display: block; font-size: 19px; letter-spacing: -.02em; }
+.reader-panel-head small { display: block; }
+.reader-panel-head button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #ffffff14; }
+.reader-panel-head svg { width: 17px; height: 17px; }
+.reader-tools-panel fieldset { border: 0; padding: 0; margin: 4px 0; min-width: 0; }
+.reader-tools-panel legend { color: #c8bedb; font-size: 12px; font-weight: 800; margin-bottom: 8px; }
+.reader-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.reader-choices button { min-height: 38px; padding: 8px 12px; border-radius: 12px; background: #ffffff0d; border: 1px solid #ffffff12; font-size: 13px; font-weight: 700; }
+.reader-choices button[aria-pressed="true"] { background: #8c63d955; border-color: #ba9afa; color: #fff; }
+.reader-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reader-full-status { color: #f3c8d8; font-size: 12px; }
+.reader-dock { position: fixed; z-index: 99; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 5px; border: 1px solid #b9a6da44; border-radius: 17px; background: #191723ed; color: #fff; box-shadow: 0 8px 32px #0009; backdrop-filter: blur(14px); }
+.reader-dock button { display: grid; place-items: center; min-width: 38px; height: 38px; padding: 0 8px; border-radius: 12px; color: #f5f0ff; }
+.reader-dock button:hover, .reader-dock button:focus-visible { background: #9d7ce255; }
+.reader-dock button:disabled { opacity: .35; cursor: default; }
+.reader-dock button[aria-pressed="true"] { background: #9771db; }
+.reader-dock svg { width: 18px; height: 18px; }
+.reader-dock [data-reader-count] { min-width: 58px; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.reader-count { bottom: 74px; }
+.reader-view.vertical { gap: var(--reader-page-gap, 0px); }
+.source-reader:not([data-mode="vertical"]) .reader-view { min-height: 100vh; padding-top: 62px; }
+.source-reader:not([data-mode="vertical"]) .rwrap:not(.reader-current), .source-reader:not([data-mode="vertical"]) .reader-end { display: none; }
+.source-reader:not([data-mode="vertical"]) .rwrap.reader-current { min-height: calc(100vh - 62px); align-items: flex-start; }
+.source-reader[data-fit="height"] .rpage { width: auto; max-height: calc(100vh - 62px); object-fit: contain; }
+.source-reader[data-fit="original"] .reader-view { overflow-x: auto; }
+@media (max-width: 500px) {
+  .reader-tools { left: 8px; }
+  .reader-dock { left: auto; right: 8px; transform: none; }
+  .reader-dock button { min-width: 36px; padding: 0 6px; }
+  .reader-dock [data-reader-settings] { display: none; }
+  .reader-bar { gap: 3px; }
+  .reader-bar .btn { padding-inline: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .reader-tools-panel { animation: none; } }
+.comic-formats { margin: -4px 0 14px; }
+.comic-formats .chip { min-height: 42px; flex: none; }
+.comic-formats .chip.active { box-shadow: 0 0 18px rgba(var(--accent-rgb), .22); }
+.comic-detail .asura-detail { padding: clamp(18px, 3vw, 30px); border: 1px solid var(--line); border-radius: var(--radius-lg); background: radial-gradient(ellipse at 15% 5%, rgba(var(--accent-rgb), .17), transparent 56%), var(--surface); box-shadow: 0 16px 45px #0002; }
+.comic-detail .asura-detail h1 { margin: 10px 0; }
+.comic-detail .asura-detail .detail-desc { line-height: 1.7; }
+.comic-detail .comic-providers { margin-bottom: 14px; }
+.comic-detail .comic-providers .chip { min-height: 42px; flex: none; }
+.comic-detail .comic-providers .chip.active { box-shadow: 0 0 18px rgba(var(--accent-rgb), .22); }
+@media (max-width: 500px) { .comic-detail .asura-detail { grid-template-columns: 100px minmax(0, 1fr); gap: 14px; padding: 14px; } .comic-detail .page-title { font-size: 23px; } }
+/* A transformed app shell would trap fixed reader controls at the end of a long chapter. */
+body.reading .app { animation: none; transform: none; }

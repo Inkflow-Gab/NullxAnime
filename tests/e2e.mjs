@@ -148,8 +148,8 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A more vivid NullxAnime') &&
-        dialog.textContent.includes('episode matching are not guaranteed') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A reader made for you') &&
+        dialog.textContent.includes('Provider availability') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
   check('system window animates and respects reduced motion', await (async () => {
@@ -496,6 +496,28 @@ try {
     return onlyVortex && current && badges && kept && await page.evaluate(() => location.hash.includes('q=Mock'));
   })());
 
+  check('comic format tabs preserve search and send MangaDex origin filter', await (async () => {
+    await page.evaluate(() => sessionStorage.clear());
+    await visit('/manga?q=Mock&sort=popular', '#comic-grid');
+    await page.evaluate(async () => (await import('./js/cache.js')).clearCache());
+    const start = networkRequests.length;
+    await page.click('.comic-formats a[href*="format=manhwa"]');
+    await page.waitForFunction(() => document.querySelector('.comic-formats .active')?.textContent === 'Manhwa' && !document.querySelector('#comic-status')?.textContent.includes('Checking'));
+    const requests = networkRequests.slice(start).map((url) => new URL(url));
+    const selected = await page.$eval('.comic-formats .active', (e) => e.getAttribute('aria-current') === 'page');
+    return selected && await page.evaluate(() => location.hash.includes('q=Mock') && location.hash.includes('sort=popular')) && requests.some((u) => u.hostname === 'api.mangadex.org' && u.searchParams.getAll('originalLanguage[]').includes('ko'));
+  })());
+
+  check('Hivetoons is an opt-in experimental catalogue', await (async () => {
+    await page.evaluate(() => sessionStorage.clear());
+    await visit('/manga?source=hive&q=Mock', '#comic-grid');
+    const warning = (await text('.comic-discovery .notice')).includes('experimental');
+    const link = await page.$eval('#comic-grid .poster', (e) => e.getAttribute('href'));
+    await page.click('#comic-grid .poster');
+    await page.waitForSelector('#comic-providers [data-provider="hive"]', { timeout: 10000 });
+    return warning && link.startsWith('#/comic/hive/') && await page.$eval('#comic-providers [data-provider="hive"]', (e) => e.getAttribute('aria-pressed') === 'true');
+  })());
+
   check('manga connection check distinguishes blocked catalogues and sample images', await (async () => {
     blockAllManga = true;
     blockSampleImage = true;
@@ -761,6 +783,52 @@ try {
     await visit('/asura/mock-series/1', '.reader', { timeout: 10000 });
     const asura = !!(await page.$('.reader-tools'));
     return width && paged && scan && asura;
+  })());
+
+  check('reader dock layouts and controls work across source readers', await (async () => {
+    await visit('/scans/vortex/mock-iken/1', '.reader-dock', { timeout: 10000 });
+    await page.$eval('.reader-tools summary', (e) => e.click());
+    await page.$eval('[data-reader-mode="ltr"]', (e) => e.click());
+    const first = await page.$eval('.source-reader', (e) => e.dataset.mode === 'ltr' && e.querySelectorAll('.reader-current').length === 1);
+    await page.$eval('[data-reader-next]', (e) => e.click());
+    const next = await page.$eval('[data-reader-count]', (e) => e.textContent.startsWith('2 /'));
+    await page.$eval('[data-reader-fit="height"]', (e) => e.click());
+    const fit = await page.$eval('.reader', (e) => e.dataset.fit === 'height');
+    await page.$eval('#reader-gap', (e) => { e.value = '20'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    const gap = await page.$eval('.reader', (e) => e.style.getPropertyValue('--reader-page-gap') === '20px');
+    await page.$eval('[data-reader-mode="vertical"]', (e) => e.click());
+    await page.$eval('[data-reader-fit="width"]', (e) => e.click());
+    return first && next && fit && gap;
+  })());
+  check('reader dock stays in the viewport and settings respect reduced motion', await (async () => {
+    await visit('/asura/mock-series/1', '.reader-dock', { timeout: 10000 });
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+    const inView = await page.$eval('.reader-dock', (e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; });
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    await page.$eval('.reader-tools summary', (e) => e.click());
+    const reduced = await page.$eval('.reader-tools-panel', (e) => getComputedStyle(e).animationName === 'none');
+    await page.keyboard.press('Escape');
+    const closed = await page.$eval('.reader-tools', (e) => !e.open);
+    await page.emulateMediaFeatures([]); return inView && reduced && closed;
+  })());
+  check('reader fullscreen enters and exits without replacing the scrolling root', await (async () => {
+    await visit('/asura/mock-series/1', '.reader-dock', { timeout: 10000 });
+    await page.click('[data-reader-full]');
+    await page.waitForFunction(() => !!document.fullscreenElement, { timeout: 5000 });
+    const entered = await page.evaluate(() => document.fullscreenElement === document.documentElement);
+    await page.click('[data-reader-full]');
+    await page.waitForFunction(() => !document.fullscreenElement && document.querySelector('[data-reader-full]')?.getAttribute('aria-label') === 'Enter fullscreen', { timeout: 5000 });
+    return entered && await page.$eval('[data-reader-full]', (e) => e.getAttribute('aria-label') === 'Enter fullscreen');
+  })());
+  check('reader auto-scroll starts, pauses and stops on navigation', await (async () => {
+    await visit('/asura/mock-series/1', '.reader-dock', { timeout: 10000 });
+    await page.evaluate(() => { document.querySelectorAll('.rwrap').forEach((el) => el.style.minHeight = '1000px'); window.scrollTo({ top: 0, behavior: 'instant' }); });
+    await page.click('[data-reader-auto]');
+    await new Promise((r) => setTimeout(r, 500));
+    const running = await page.evaluate(() => window.scrollY > 0 && document.querySelector('[data-reader-auto]').getAttribute('aria-pressed') === 'true');
+    await page.click('[data-reader-auto]');
+    const paused = await page.$eval('[data-reader-auto]', (e) => e.getAttribute('aria-pressed') === 'false');
+    return running && paused;
   })());
 
   console.log('Tracker, discover, settings');

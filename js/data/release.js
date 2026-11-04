@@ -1,10 +1,10 @@
 // Pages stamps the deployed commit as the unique release ID.
 export const RELEASE = Object.freeze({
-  id: '2026-11-featured-sources',
-  title: 'A more vivid NullxAnime',
+  id: '2026-11-reader-studio',
+  title: 'A reader made for you',
   changes: [
-    'Explore featured anime with new carousel controls and a polished update entrance.',
-    'Filter manga, manhwa and manhua by Asura, Vortex or MangaDex.',
-    'Anime alternatives are easier to find; playback and episode matching are not guaranteed.',
+    'Read with a compact dock, fullscreen, layout choices, sizing, spacing and auto-scroll.',
+    'Browse manga, manhwa and manhua with new format tabs and clearer provider controls.',
+    'Provider availability and chapter access can change.',
   ],
 });
