@@ -446,3 +446,18 @@ body.reading { padding-bottom: 0; background: #0a0a0f; }
 .adult-filters .select { width: 100%; }
 .adult-filter-note { font-size: 12.5px; line-height: 1.5; }
 @media (max-width: 420px) { .adult-filters label { max-width: none; } .adult-sort a { padding: 7px 11px; font-size: 13px; } }
+
+/* Source filters let readers retry a specific catalogue without hiding alternatives. */
+.comic-sources { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 14px; }
+.comic-sources a { padding: 7px 12px; border: 1px solid var(--line-2); border-radius: 999px; color: var(--text-2); font-size: 13px; font-weight: 700; }
+.comic-sources a:hover { border-color: var(--accent); color: var(--text); }
+.comic-sources a.on { color: #fff; background: rgba(var(--accent-rgb), .27); border-color: var(--accent); }
+
+/* Featured carousel: deliberate controls and a clearer visual hierarchy. */
+#hero .hero-transport { position: absolute; z-index: 4; right: var(--gutter); bottom: 72px; display: flex; align-items: center; gap: 6px; color: #f6f0ff; }
+.hero-transport button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #ffffff4d; border-radius: 50%; background: #100d1ca8; color: white; }
+.hero-transport button:hover, .hero-transport button:focus-visible { background: var(--accent); border-color: white; }
+.hero-transport button:disabled { opacity: .55; cursor: not-allowed; }
+.hero-transport button svg { width: 16px; height: 16px; }
+.hero-transport #hero-count { min-width: 46px; text-align: center; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { #hero .hero-transport { right: var(--gutter); bottom: 12px; } }

@@ -8,6 +8,8 @@ const players = [
   ['Movies Nexus', 'https://www.moviesnexus.fun/anime/154587/1/sub'],
   ['MegaVid', 'https://megavid.buzz/ani/154587/1/sub'],
   ['Shonen', 'https://shonen.to/embed/anilist/154587/1?language=sub&parentOrigin=https%3A%2F%2Finkflow-gab.github.io'],
+  ['VidNest', 'https://vidnest.fun/anime/154587/1/sub'],
+  ['Zokoanime', 'https://zokoanime.video/stream/anilist/154587/1/sub?autoplay=0'],
 ];
 const note = (level, text) => console.log(`::${level}::${text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
 let browser;
@@ -26,7 +28,7 @@ try {
       const frames = page.frames();
       const videos = (await Promise.all(frames.map((f) => f.evaluate(() => Array.from(document.querySelectorAll('video'), (v) => ({ ready: v.readyState, time: v.currentTime, error: v.error?.code || 0 }))).catch(() => [])))).flat();
       const playing = videos.some((v) => v.ready >= 2 && v.time > 1 && !v.error);
-      note(playing ? 'notice' : 'warning', `${name} sandboxed sample ${playing ? 'observed video progress' : 'did not observe video progress'} for AniList 154587 episode 1 (${frames.length} frames, ${videos.length} video elements). Availability varies.`);
+      note(playing ? 'notice' : 'warning', `${name} sandboxed sample ${playing ? 'observed video progress' : 'did not observe video progress'} for AniList 154587 episode 1 (${frames.length} frames, ${videos.length} video elements). This does not confirm the correct episode; availability varies.`);
     } catch (e) { note('warning', `${name} live probe failed: ${e.message}`); }
     finally { await page.close(); }
   }));

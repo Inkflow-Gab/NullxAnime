@@ -48,13 +48,16 @@ export async function mountComicDiscovery(ctx) {
   if (!box) return;
   const q = String(ctx.query.q || '').trim().slice(0, 150);
   const sort = ctx.query.sort === 'popular' ? 'popular' : 'latest';
-  const link = (s) => `#/manga${hashQuery({ q, sort: s === 'latest' ? '' : s })}`;
+  const source = ['asura', 'vortex', 'mangadex'].includes(ctx.query.source) ? ctx.query.source : 'all';
+  const route = (patch = {}) => `/manga${hashQuery({ q, sort: sort === 'latest' ? '' : sort, source: source === 'all' ? '' : source, ...patch })}`;
+  const link = (s) => `#${route({ sort: s === 'latest' ? '' : s })}`;
   render(box, html`<section class="section comic-discovery">
-    <div class="search-head"><div><h1 class="page-title">Manga &amp; manhwa</h1><p class="muted">Explore available catalogues together. Open a title, then find its chapters by provider.</p></div></div>
-    <form id="comic-search" class="filter-bar"><label class="sr-only" for="comic-query">Search manga and manhwa</label><input class="input" id="comic-query" value="${q}" placeholder="Search manga, manhwa or manhua…" style="max-width:500px;flex:1"><button class="btn primary">${icon('search')} Search</button>${q ? html`<a class="btn" href="#/manga${hashQuery({ sort: sort === 'popular' ? sort : '' })}">Clear</a>` : ''}</form>
+    <div class="search-head"><div><h1 class="page-title">Manga, manhwa &amp; manhua</h1><p class="muted">Explore available catalogues together or browse one source. Open a title, then find its chapters by provider.</p></div></div>
+    <form id="comic-search" class="filter-bar"><label class="sr-only" for="comic-query">Search manga, manhwa and manhua</label><input class="input" id="comic-query" value="${q}" placeholder="Search manga, manhwa or manhua…" style="max-width:500px;flex:1"><button class="btn primary">${icon('search')} Search</button>${q ? html`<a class="btn" href="#${route({ q: '' })}">Clear</a>` : ''}</form>
     <nav class="seg comic-sort" id="comic-sort" aria-label="Manga sorting"><a href="${link('latest')}" class="${sort === 'latest' ? 'on' : ''}" ${sort === 'latest' ? html`aria-current="page"` : ''}>Latest</a><a href="${link('popular')}" class="${sort === 'popular' ? 'on' : ''}" ${sort === 'popular' ? html`aria-current="page"` : ''}>Popular</a></nav>
+    <nav class="comic-sources" aria-label="Manga catalogue source">${[['all', 'All sources'], ['asura', 'Asura'], ['vortex', 'Vortex'], ['mangadex', 'MangaDex']].map(([value, label]) => html`<a href="#${route({ source: value === 'all' ? '' : value })}" class="${source === value ? 'on' : ''}" ${source === value ? html`aria-current="page"` : ''}>${label}</a>`)}</nav>
     <div class="browse-head"><h2>${q ? `Matches for “${q}”` : sort === 'popular' ? 'Popular manga & manhwa' : 'Recently updated'}</h2>${layoutControls()}</div>
-    <p class="muted comic-help">${sort === 'popular' ? 'Popular results from each source, mixed together; not a single global ranking.' : 'Recent results from each source; ordering is limited to the titles returned.'} Chapter access can change.</p>
+    <p class="muted comic-help">${source === 'all' ? (sort === 'popular' ? 'Popular results from each source, mixed together; not a single global ranking.' : 'Recent results from each source; ordering is limited to the titles returned.') : 'Showing results from the selected source only.'} Chapter access can change.</p>
     <div id="comic-results">${skelGrid(8)}</div><div id="comic-status" class="muted" role="status"></div>
     <details class="comic-diagnostic"><summary>Having trouble connecting?</summary><p class="muted">Check direct and relay catalogue connections and sample page images from this device. Manga searches and chapter requests may go through the relay. This does not test every title. A failure may be caused by the provider, browser, network, or region.</p><button class="btn sm" id="comic-check" type="button">Check connections</button><div id="comic-check-results" role="status" aria-live="polite"></div></details>
   </section>`);
@@ -62,7 +65,7 @@ export async function mountComicDiscovery(ctx) {
   $('#comic-search', box).addEventListener('submit', (e) => {
     e.preventDefault();
     const term = $('#comic-query', box).value.trim().slice(0, 150);
-    go(`/manga${hashQuery({ q: term, sort: sort === 'popular' ? sort : '' })}`);
+    go(route({ q: term }));
   });
   $('#comic-check', box).addEventListener('click', async (event) => {
     const button = event.currentTarget;
@@ -77,10 +80,10 @@ export async function mountComicDiscovery(ctx) {
     if (ctx.alive()) button.disabled = false;
   });
   const requests = [
-    { name: 'Asura', source: 'asura', promise: asuraSearch(q, 1, sort) },
-    { name: 'Vortex', source: 'vortex', promise: scansSearch('vortex', q, 1, sort) },
-    { name: 'MangaDex', source: 'mangadex', promise: listManga({ q, limit: 20, lang: getSettings().mangaLang, order: sort === 'popular' ? { followedCount: 'desc' } : { latestUploadedChapter: 'desc' } }) },
-  ];
+    { name: 'Asura', source: 'asura', load: () => asuraSearch(q, 1, sort) },
+    { name: 'Vortex', source: 'vortex', load: () => scansSearch('vortex', q, 1, sort) },
+    { name: 'MangaDex', source: 'mangadex', load: () => listManga({ q, limit: 20, lang: getSettings().mangaLang, order: sort === 'popular' ? { followedCount: 'desc' } : { latestUploadedChapter: 'desc' } }) },
+  ].filter((item) => source === 'all' || item.source === source);
   const results = Array(requests.length).fill(null);
   const paint = () => {
     if (!ctx.alive()) return;
@@ -93,12 +96,12 @@ export async function mountComicDiscovery(ctx) {
     const failed = results.flatMap((r, i) => r?.status === 'rejected' ? [requests[i].name] : []);
     const seen = new Set();
     const unique = entries.filter((it) => { const key = it.title.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); if (seen.has(key)) return false; seen.add(key); return true; });
-    if (unique.length || results.every(Boolean)) render($('#comic-results', box), unique.length ? html`<div class="grid layout-grid ${layoutClass()}" id="comic-grid">${unique.map((it) => html`<article class="card"><a class="poster" href="#/comic/${it.source}/${encodeURIComponent(it.slug)}?title=${encodeURIComponent(it.title)}" aria-label="${it.title}"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${it.cover || PLACEHOLDER}" alt=""><span class="shade"></span><span class="tl"><span class="badge accent">${it.type}</span></span><span class="play">${icon('book')}</span></a><a class="meta" href="#/comic/${it.source}/${encodeURIComponent(it.slug)}?title=${encodeURIComponent(it.title)}"><div class="title">${it.title}</div><div class="sub">${it.updatedAt ? `Updated ${timeAgo(it.updatedAt)}` : 'Open to find chapters'}</div></a></article>`)}</div>` : html`<p class="notice">${failed.length ? 'No results were returned and some catalogues could not be reached. Try again or use the connection check below.' : q ? 'No matches were returned. Try another title or spelling.' : 'No catalogue results are available right now. Try the connection check below.'}</p>`);
+    if (unique.length || results.every(Boolean)) render($('#comic-results', box), unique.length ? html`<div class="grid layout-grid ${layoutClass()}" id="comic-grid">${unique.map((it) => html`<article class="card"><a class="poster" href="#/comic/${it.source}/${encodeURIComponent(it.slug)}?title=${encodeURIComponent(it.title)}" aria-label="${it.title}"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${it.cover || PLACEHOLDER}" alt=""><span class="shade"></span><span class="tl"><span class="badge accent">${it.type}</span><span class="badge">${it.sourceName}</span></span><span class="play">${icon('book')}</span></a><a class="meta" href="#/comic/${it.source}/${encodeURIComponent(it.slug)}?title=${encodeURIComponent(it.title)}"><div class="title">${it.title}</div><div class="sub">${it.sourceName} · ${it.updatedAt ? `Updated ${timeAgo(it.updatedAt)}` : 'Open to find chapters'}</div></a></article>`)}</div>` : html`<p class="notice">${failed.length ? 'No results were returned and some catalogues could not be reached. Try again or use the connection check below.' : q ? 'No matches were returned. Try another title or spelling.' : 'No catalogue results are available right now. Try the connection check below.'}</p>`);
     const pending = results.filter((r) => !r).length;
-    render($('#comic-status', box), html`${pending ? html`<p>Checking ${pending} more source${pending === 1 ? '' : 's'}…</p>` : ''}${failed.length ? html`<p>${failed.join(', ')} could not be reached. Other catalogues may still work.</p><button class="btn sm" data-action="retry">Try again</button>` : ''}`);
+    render($('#comic-status', box), html`${pending ? html`<p>Checking ${pending} more source${pending === 1 ? '' : 's'}…</p>` : ''}${failed.length ? html`<p>${failed.join(', ')} could not be reached. ${source === 'all' ? 'Other catalogues may still work.' : 'Try another source or use the connection check below.'}</p><button class="btn sm" data-action="retry">Try again</button>` : ''}`);
   };
   await Promise.all(requests.map(async (request, i) => {
-    try { results[i] = { status: 'fulfilled', value: await request.promise }; }
+    try { results[i] = { status: 'fulfilled', value: await request.load() }; }
     catch { results[i] = { status: 'rejected' }; }
     paint();
   }));

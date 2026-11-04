@@ -20,7 +20,7 @@ export function showUpdateWindow({ force = false } = {}) {
   el.className = 'scrim update-scrim';
   el.id = 'update-notice';
   el.innerHTML = html`<div class="update-rupture" aria-hidden="true">
-    <div class="update-impact"></div>
+    <div class="update-impact"></div><div class="update-pulse-ring ring-one"></div><div class="update-pulse-ring ring-two"></div>
     <svg class="update-glass" viewBox="0 0 800 800" preserveAspectRatio="xMidYMid meet" focusable="false">
       <g class="glass-shards"><path class="shard shard-a" d="M400 400 201 121 66 290 250 349Z"/><path class="shard shard-b" d="M400 400 201 121 379 48 477 278Z"/><path class="shard shard-c" d="M400 400 477 278 731 218 661 368Z"/><path class="shard shard-d" d="M400 400 661 368 738 557 511 525Z"/><path class="shard shard-e" d="M400 400 511 525 592 731 350 666Z"/><path class="shard shard-f" d="M400 400 350 666 106 588 250 349Z"/></g>
       <g class="glass-cracks" fill="none" stroke-linecap="round" stroke-linejoin="round">

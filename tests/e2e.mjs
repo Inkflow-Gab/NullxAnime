@@ -57,7 +57,7 @@ async function mockNetwork(page) {
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/data/release.js' && mockNextRelease) return req.respond({ status: 200, contentType: 'text/javascript', body: "export const RELEASE = { id: 'test-next-release', title: 'Future update', changes: ['New future feature'] };" });
     if (u.origin === new URL(BASE).origin && u.pathname === '/js/config.js' && (!useLiveGateway || mockProviderEndpoints || mockMangaGateway)) return req.respond({ status: 200, contentType: 'text/javascript', body: `export const PROVIDER_ENDPOINTS = Object.freeze({ kitsuneApi: '${mockProviderEndpoints ? 'https://kitsune-api.test/api' : ''}', streamWorker: '${mockProviderEndpoints ? 'https://stream.test' : ''}', aniPub: '${mockProviderEndpoints ? 'https://anipub.test' : ''}', mangaGateway: '${mockMangaGateway ? 'https://manga-gateway.test' : ''}' });` });
     if (u.origin === new URL(BASE).origin) return req.continue();
-    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun', 'megavid.buzz', 'shonen.to'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
+    if (['supaplay.fun', 'aniembed.se', 'www.moviesnexus.fun', 'megavid.buzz', 'shonen.to', 'vidnest.fun', 'zokoanime.video'].includes(u.hostname)) return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'api.aniweeb.net') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Aniweeb episode mock</body></html>' });
     if (u.hostname === 'megaplay.buzz') return req.respond({ status: 200, contentType: 'text/html', body: '<html><body>Episode player mock</body></html>' });
     if (u.hostname === 'kitsune-api.test' && u.pathname === '/api/episodes/mkissa/1000') return req.respond(json({ providers: { mkissa: { episodes: { sub: [{ id: 'watch/mkissa/1000/sub/mkissa-1', number: 1 }] } } } }));
@@ -148,8 +148,8 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('In-page adult servers') &&
-        dialog.textContent.includes('not verified') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A more vivid NullxAnime') &&
+        dialog.textContent.includes('episode matching vary') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
   check('system window animates and respects reduced motion', await (async () => {
@@ -161,7 +161,7 @@ try {
     await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'on'));
     const lightweight = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'update-soft-glow');
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-    const lightweightReduced = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'none');
+    const lightweightReduced = await page.$eval('.update-sigil', (el) => getComputedStyle(el).animationName === 'none') && await page.$eval('.update-window', (el) => getComputedStyle(el).animationName === 'none');
     await page.emulateMediaFeatures([]);
     await page.evaluate(async () => (await import('./js/store.js')).setSetting('performanceMode', 'auto'));
     return animated && reduced && lightweight && lightweightReduced;
@@ -216,6 +216,28 @@ try {
   check('hero tabs support keyboard navigation', await (async () => {
     await page.focus('#hero [data-dot="0"]'); await page.keyboard.press('ArrowRight');
     return (await page.$eval('#hero [data-dot="1"]', (e) => e.getAttribute('aria-selected'))) === 'true' && (await page.$eval('.hero-slide.active', (e) => e.dataset.i)) === '1';
+  })());
+  check('hero controls pause and select slides without eagerly loading all images', await (async () => {
+    await visit('/search', '#results');
+    await visit('/', '.hero-slide.active');
+    const lazy = await count('.hero-slide:not(.active) img[data-hero-src]');
+    await page.click('[data-hero-pause]');
+    await page.click('[data-hero-next]');
+    const next = await page.$eval('.hero-slide.active', (el) => el.dataset.i === '1' && !!el.querySelector('img').getAttribute('src'));
+    await page.click('[data-hero-prev]');
+    await page.$eval('#hero', (el) => el.dispatchEvent(new MouseEvent('mouseleave')));
+    await new Promise((r) => setTimeout(r, 8400));
+    const stayed = await page.$eval('.hero-slide.active', (el) => el.dataset.i === '0');
+    const pressed = await page.$eval('[data-hero-pause]', (el) => el.getAttribute('aria-pressed') === 'true');
+    await page.click('[data-hero-pause]');
+    return lazy > 0 && next && stayed && pressed && await page.$eval('[data-hero-pause]', (el) => el.getAttribute('aria-pressed') === 'false');
+  })());
+  check('system reduced motion starts carousel paused', await (async () => {
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    await visit('/search', '#results');
+    await visit('/', '.hero-slide.active');
+    const disabled = await page.$eval('[data-hero-pause]', (el) => el.disabled && el.getAttribute('aria-pressed') === 'true');
+    await page.emulateMediaFeatures([]); return disabled;
   })());
   check('ranking: top 10 with big numerals right under the hero', (await count('#rank-track .rank-item')) === 10 && (await page.$eval('.hero + .container > .ranking', () => true).catch(() => false)));
   check('ranking tabs switch lists', await (async () => { const a = await text('#rank-track .card .title'); await page.click('[data-rank="top"]'); await new Promise((r) => setTimeout(r, 200)); return (await count('#rank-track .rank-item')) === 10 && a.length > 0; })());
@@ -315,7 +337,7 @@ try {
     return first && await page.$eval('#stage iframe', (e) => e.src === 'https://api.aniweeb.net/embed/ani/1000/1?track=dub&server=2') && !(await page.$('#panel input[type="url"]'));
   })());
   check('additional episode players use sandboxed embeds and audio choices', await (async () => {
-    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun'], ['megavid', 'megavid.buzz'], ['shonen', 'shonen.to']]) {
+    for (const [id, host] of [['supaplay', 'supaplay.fun'], ['aniembed', 'aniembed.se'], ['nexus', 'www.moviesnexus.fun'], ['megavid', 'megavid.buzz'], ['shonen', 'shonen.to'], ['vidnest', 'vidnest.fun'], ['zoko', 'zokoanime.video']]) {
       await page.$eval(`[data-src="${id}"]`, (e) => e.click());
       const first = await page.$eval('#stage iframe', (f) => ({ host: new URL(f.src).hostname, sandbox: f.getAttribute('sandbox') }));
       if (first.host !== host || !first.sandbox || first.sandbox.includes('allow-popups')) return false;
@@ -450,6 +472,23 @@ try {
     return mixedSources && correctSorts && keptPopular && latestRequests.some((u) => u.hostname === 'api.asurascans.com' && u.searchParams.get('sort') === 'latest') &&
       latestRequests.some((u) => u.hostname === 'api.vortexscans.org' && u.searchParams.get('orderBy') === 'latestChapter') &&
       latestRequests.some((u) => u.hostname === 'api.mangadex.org' && u.searchParams.get('order[latestUploadedChapter]') === 'desc');
+  })());
+
+  check('manga source filters isolate requests and retain search and sort', await (async () => {
+    await page.evaluate(() => sessionStorage.clear());
+    await visit('/manga?q=Mock&sort=popular', '#comic-grid');
+    await page.evaluate(async () => (await import('./js/cache.js')).clearCache());
+    const start = networkRequests.length;
+    await page.click('.comic-sources a[href*="source=vortex"]');
+    await page.waitForFunction(() => location.hash.includes('source=vortex') && document.querySelector('.comic-sources .on')?.textContent === 'Vortex' && !!document.querySelector('#comic-grid') && !document.querySelector('#comic-status').textContent.includes('Checking'));
+    const urls = networkRequests.slice(start).map((u) => new URL(u));
+    const onlyVortex = urls.some((u) => u.hostname === 'api.vortexscans.org') && !urls.some((u) => ['api.asurascans.com', 'api.mangadex.org'].includes(u.hostname));
+    const current = await page.$eval('.comic-sources .on', (el) => el.getAttribute('aria-current') === 'page' && el.textContent === 'Vortex');
+    const badges = await page.$$eval('#comic-grid .card .sub', (items) => items.length > 0 && items.every((el) => el.textContent.includes('Vortex')));
+    const kept = await page.evaluate(() => location.hash.includes('q=Mock') && location.hash.includes('sort=popular'));
+    await page.click('#comic-sort a:not(.on)');
+    await page.waitForFunction(() => location.hash.includes('source=vortex') && !location.hash.includes('sort=popular') && document.querySelector('#comic-sort .on')?.textContent === 'Latest' && !!document.querySelector('#comic-grid'));
+    return onlyVortex && current && badges && kept && await page.evaluate(() => location.hash.includes('q=Mock'));
   })());
 
   check('manga connection check distinguishes blocked catalogues and sample images', await (async () => {
