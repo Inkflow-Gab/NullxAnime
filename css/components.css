@@ -268,7 +268,6 @@ html[data-theme="light"] .glass { background: rgba(255, 255, 255, .7); }
 @keyframes shard-d { to { opacity: 0; transform: translate(75px, 36px) rotate(-8deg); } }
 @keyframes shard-e { to { opacity: 0; transform: translate(30px, 75px) rotate(7deg); } }
 @keyframes shard-f { to { opacity: 0; transform: translate(-65px, 50px) rotate(-8deg); } }
-@keyframes update-breach { 0%, 43% { opacity: 0; transform: scale(.88); } 50% { opacity: .65; transform: scale(1.04) translateX(-3px); } 55% { opacity: 1; transform: scale(.99) translateX(3px); } 60% { transform: scale(1.01) translateX(-1px); } 72%, 100% { opacity: 1; transform: none; } }
 @keyframes update-glitch-cyan { 0%, 95%, 100% { opacity: 0; transform: none; } 96% { opacity: .8; transform: translate(-2px, -1px); clip-path: inset(12% 0 58%); } 97% { opacity: .7; transform: translate(3px, 1px); clip-path: inset(52% 0 18%); } 98% { opacity: 0; } }
 @keyframes update-glitch-magenta { 0%, 95%, 100% { opacity: 0; transform: none; } 96% { opacity: .7; transform: translate(3px, 1px); clip-path: inset(55% 0 12%); } 97% { opacity: .6; transform: translate(-3px, -1px); clip-path: inset(18% 0 54%); } 98% { opacity: 0; } }
 @keyframes update-enter { from { opacity: 0; transform: translateY(12px) scale(.97); filter: brightness(1.6); } to { opacity: 1; transform: none; filter: none; } }
@@ -292,3 +291,18 @@ html.reduce-motion .update-rupture { display: none; }
   .update-rupture { display: none; }
   .update-scrim, .update-window, .update-sigil, .update-effects::before, .update-window h2::before, .update-window h2::after, html[data-performance="on"] .update-window, html[data-performance="on"] .update-sigil { animation: none; }
 }
+
+/* A single dimensional burst, followed by the existing glass and glitch sequence. */
+.update-pulse-ring { position: absolute; top: 50%; left: 50%; width: min(72vmin, 580px); aspect-ratio: 1; border: 2px solid #d5bfff; border-radius: 50%; opacity: 0; transform: translate(-50%, -50%) scale(.25); box-shadow: 0 0 25px #bd8aff88, inset 0 0 25px #b388ff44; animation: update-ring 1.1s .34s ease-out both; }
+.update-pulse-ring.ring-two { animation-delay: .46s; border-color: #9ce3ff; }
+@keyframes update-ring { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.25); } 25% { opacity: .65; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55); } }
+@keyframes update-breach { 0%, 39% { opacity: 0; transform: perspective(900px) translateY(35px) scale(.72) rotateX(-12deg); } 50% { opacity: .9; transform: perspective(900px) translateY(-5px) scale(1.04) rotateX(2deg); } 57% { opacity: 1; transform: translateX(4px) scale(.985); } 63% { transform: translateX(-2px) scale(1.01); } 75%, 100% { opacity: 1; transform: none; } }
+.update-changes li { animation: update-line-in .5s 1s both; }
+.update-changes li:nth-child(2) { animation-delay: 1.08s; }
+.update-changes li:nth-child(3) { animation-delay: 1.16s; }
+.update-changes li:nth-child(4) { animation-delay: 1.24s; }
+@keyframes update-line-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+html[data-performance="on"] .update-pulse-ring { display: none; }
+html[data-performance="on"] .update-window { animation-name: update-quiet-enter; animation-duration: .5s; }
+html[data-performance="on"] .update-changes li { animation: none; }
+@media (prefers-reduced-motion: reduce) { .update-pulse-ring { display: none; } .update-changes li, html[data-performance="on"] .update-window { animation: none; } }

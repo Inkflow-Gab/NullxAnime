@@ -62,7 +62,7 @@ function heroSection(items) {
       const img = m.bannerImage || m.trailer?.thumbnail || m.coverImage?.extraLarge;
       const meta = [fmtFormat(m.format), m.episodes ? `${m.episodes} eps` : null, m.seasonYear, m.studios?.nodes?.[0]?.name].filter(Boolean);
       return html`<div class="hero-slide ${i === 0 ? 'active' : ''}" data-i="${i}" aria-hidden="${i === 0 ? 'false' : 'true'}">
-        <img class="hero-bg" src="${img}" alt="" ${i === 0 ? '' : html`loading="lazy"`} referrerpolicy="no-referrer">
+        <img class="hero-bg" ${i === 0 ? html`src="${img}" fetchpriority="high"` : html`data-hero-src="${img}" loading="lazy"`} alt="" referrerpolicy="no-referrer">
         <div class="hero-shade"></div>
         <div class="container hero-content">
           <div class="hero-kicker"><span class="badge accent">${icon('flame')} #${i + 1} Trending</span>${it.score ? html`<span class="badge score">${icon('star')} ${it.score}</span>` : ''}</div>
@@ -77,6 +77,7 @@ function heroSection(items) {
         </div>
       </div>`;
     })}
+    <div class="hero-transport" role="group" aria-label="Featured anime controls"><button type="button" data-hero-prev aria-label="Previous featured anime">${icon('chevL')}</button><span id="hero-count" aria-live="polite">1 / ${items.length}</span><button type="button" data-hero-next aria-label="Next featured anime">${icon('chevR')}</button><button type="button" data-hero-pause aria-label="Pause featured anime carousel" aria-pressed="false">${icon('pause')}</button></div>
     <div class="hero-dots" role="tablist">${items.map((_, i) => html`<button role="tab" data-dot="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Slide ${i + 1}" aria-selected="${i === 0 ? 'true' : 'false'}" tabindex="${i === 0 ? '0' : '-1'}"></button>`)}</div>
   </section>`;
 }
@@ -85,15 +86,29 @@ function startHero(ctx) {
   const hero = $('#hero');
   if (!hero) return;
   const slides = $$('.hero-slide', hero), dots = $$('[data-dot]', hero);
-  let i = 0, timer;
+  const pause = $('[data-hero-pause]', hero), count = $('#hero-count', hero);
+  const reduced = getSettings().reduceMotion || !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  let i = 0, timer, paused = reduced;
+  if (reduced) { pause.disabled = true; pause.setAttribute('aria-label', 'Carousel autoplay disabled by reduced motion'); pause.setAttribute('aria-pressed', 'true'); pause.innerHTML = icon('play').toString(); }
   const show = (n) => {
     i = (n + slides.length) % slides.length;
-    slides.forEach((s, k) => { s.classList.toggle('active', k === i); s.setAttribute('aria-hidden', k === i ? 'false' : 'true'); });
+    slides.forEach((s, k) => { if (k === i) s.querySelectorAll('[data-hero-src]').forEach((img) => { img.src = img.dataset.heroSrc; delete img.dataset.heroSrc; }); s.classList.toggle('active', k === i); s.setAttribute('aria-hidden', k === i ? 'false' : 'true'); });
+    count.textContent = `${i + 1} / ${slides.length}`;
     dots.forEach((d, k) => { d.classList.toggle('on', k === i); d.setAttribute('aria-selected', String(k === i)); d.tabIndex = k === i ? 0 : -1; });
   };
-  const play = () => { stop(); if (!getSettings().reduceMotion && slides.length > 1) timer = setInterval(() => { if (!document.hidden) show(i + 1); }, 8000); };
+  const play = () => { stop(); if (!paused && !hero.matches(':hover') && !hero.contains(document.activeElement) && !getSettings().reduceMotion && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && slides.length > 1) timer = setInterval(() => { if (!document.hidden) show(i + 1); }, 8000); };
   const stop = () => clearInterval(timer);
-  hero.addEventListener('click', (e) => { const d = e.target.closest('[data-dot]'); if (d) { show(Number(d.dataset.dot)); play(); } });
+  hero.addEventListener('click', (e) => {
+    const d = e.target.closest('[data-dot]');
+    if (d) { show(Number(d.dataset.dot)); play(); }
+    else if (e.target.closest('[data-hero-prev]')) { show(i - 1); play(); }
+    else if (e.target.closest('[data-hero-next]')) { show(i + 1); play(); }
+    else if (e.target.closest('[data-hero-pause]')) {
+      paused = !paused; pause.setAttribute('aria-pressed', String(paused));
+      pause.setAttribute('aria-label', paused ? 'Resume featured anime carousel' : 'Pause featured anime carousel');
+      pause.innerHTML = icon(paused ? 'play' : 'pause').toString(); play();
+    }
+  });
   hero.addEventListener('keydown', (e) => {
     if (!e.target.closest('[data-dot]')) return;
     const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? slides.length - 1 : null;

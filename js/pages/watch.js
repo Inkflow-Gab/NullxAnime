@@ -40,8 +40,11 @@ export default async function watch(ctx) {
   const posKey = `a:${id}:${ep}`;
   const normalTabs = [
     ...(count > 0 ? [{ id: 'instant', kind: 'instant', label: 'Instant play', note: 'Play the selected episode' }] : []),
+    // Prioritize the alternatives that showed video progress in a single live sample.
+    // This is not proof of episode identity or availability for other titles.
+    ...(count > 0 ? ['supaplay', 'megavid'].map((id) => ({ id, kind: 'extra', label: EXTRA_PLAYERS[id].label, note: 'Third-party episode player' })) : []),
     ...(count > 0 ? [{ id: 'aniweeb', kind: 'aniweeb', label: 'Aniweeb', note: 'Alternate episode player' }] : []),
-    ...(count > 0 ? Object.entries(EXTRA_PLAYERS).map(([id, p]) => ({ id, kind: 'extra', label: p.label, note: 'Third-party episode player' })) : []),
+    ...(count > 0 ? Object.entries(EXTRA_PLAYERS).filter(([id]) => !['supaplay', 'megavid'].includes(id)).map(([id, p]) => ({ id, kind: 'extra', label: p.label, note: 'Third-party episode player' })) : []),
     ...(PROVIDER_ENDPOINTS.kitsuneApi ? [{ id: 'mkissa', kind: 'kitsune', label: 'MKissa', note: 'MKissa anime' }] : []),
     ...(PROVIDER_ENDPOINTS.kitsuneApi ? [{ id: 'kitsune', kind: 'kitsune', label: 'More servers', note: 'Additional provider mirrors' }] : []),
     ...(PROVIDER_ENDPOINTS.streamWorker ? [{ id: 'senshi', kind: 'senshi', label: 'Senshi', note: 'Kitsune-derived mirrors' }, { id: 'animegg', kind: 'animegg', label: 'AnimeGG', note: 'Kitsune-derived provider' }] : []),
@@ -265,7 +268,7 @@ export default async function watch(ctx) {
         <div><b>${tab.label}</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
         <div class="seg" role="group" aria-label="Audio language">${['sub', 'dub'].map((a) => html`<button type="button" data-extra-audio="${a}" class="${audio === a ? 'on' : ''}" aria-pressed="${audio === a}">${a === 'sub' ? 'Sub' : 'Dub'}</button>`)}</div>
         <button type="button" class="btn sm" data-extra-retry>${icon('refresh')} Retry player</button>
-        <p class="muted instant-help">Popup protection is enabled; in-player ads may still appear. ${tab.label.includes('experimental') ? 'This player is experimental and real playback has not been verified. ' : ''}If this provider or audio track fails, try another source. Availability and playback depend on the provider.</p>
+        <p class="muted instant-help">Popup protection is enabled; in-player ads may still appear. ${tab.label.includes('experimental') ? 'This player is experimental and real playback has not been verified. ' : ''}If this provider or audio track fails, try another source. Playback and episode matching depend on the provider and are not guaranteed.</p>
       </div>`);
     };
     drawPlayer();
