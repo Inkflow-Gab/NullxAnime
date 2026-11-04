@@ -79,7 +79,7 @@ export default async function watch(ctx) {
     </div>
     <div class="watch">
       <div class="watch-main">
-        <div class="stage-wrap"><div class="stage" id="stage"></div></div>
+        <div id="player-notice"></div><div class="stage-wrap"><div class="stage" id="stage"></div></div>
         ${m.isAdult ? html`<div class="notice adult-player-notice" role="status"><b>18+ in-page servers</b> · Playback and episode matching are not verified for this title. Try another server if one fails; video and ads come from third parties.</div>` : ''}
         <div class="source-tabs tabs-scroll" id="tabs" role="tablist" aria-label="${m.isAdult ? 'Adult episode servers' : 'Episode servers'}"></div>
         <div class="watch-bar">
@@ -91,6 +91,7 @@ export default async function watch(ctx) {
           </div>
         </div>
         <div id="panel"></div>
+        <details class="tv-playback-help" id="tv-playback-help"><summary>TV playback help</summary><p>Use the remote to focus the player, then press OK or Play. If you see subtitles but no picture, try another server or a lower quality inside its player. Older TVs may not support the stream’s video format. Embedded players are controlled by their providers, so TV playback cannot be guaranteed.</p><p>For the built-in player, focus the video and press OK to play or pause; left and right seek. With native TV controls, press Back to return to app controls. TV mode is available in Settings.</p><div id="tv-playback-capabilities"></div></details>
         <label class="row switch-row"><span class="switch"><input type="checkbox" id="autonext" ${getSettings().autoNext ? 'checked' : ''}><i></i></span><span>Auto-play the next episode when a video finishes</span></label>
       </div>
       <aside class="watch-side glass">
@@ -104,7 +105,15 @@ export default async function watch(ctx) {
   </div>`);
 
   mountSeasonPicker(ctx, m, '#watch-seasons', true);
-  const stage = $('#stage'), panel = $('#panel');
+  const stage = $('#stage'), panel = $('#panel'), playerNotice = $('#player-notice');
+  const tvCapabilities = $('#tv-playback-capabilities');
+  const tvHelp = $('#tv-playback-help');
+  tvHelp.addEventListener('toggle', () => {
+    if (!tvHelp.open || tvCapabilities.textContent) return;
+    const video = document.createElement('video');
+    const capability = (type) => { try { return video.canPlayType(type) || 'not reported'; } catch { return 'not reported'; } };
+    render(tvCapabilities, html`<p>Browser reports: H.264 ${capability('video/mp4; codecs="avc1.42E01E"')}, HLS ${capability('application/vnd.apple.mpegurl')}, Media Source ${typeof window.MediaSource !== 'undefined' ? 'available' : 'not available'}. This does not test a particular stream or guarantee playback.</p>`);
+  });
 
   const paintEpisodes = () => {
     const marks = getMarks('anime', id);
@@ -172,7 +181,7 @@ export default async function watch(ctx) {
     $('#prev').setAttribute('href', `#/watch/${id}/${ep - 1}${suffix}`);
     $('#next').setAttribute('href', `#/watch/${id}/${ep + 1}${suffix}`);
     $$('.ep-row', ctx.el).forEach((row) => row.setAttribute('href', `#/watch/${id}/${row.dataset.ep}${suffix}`));
-    render(panel, '');
+    render(panel, ''); render(playerNotice, '');
     history.replaceState(null, '', `#/watch/${id}/${ep}${tab.id !== defaultTab.id ? `?src=${tab.id}` : ''}`);
     if (tab.kind === 'instant') instantView();
     else if (tab.kind === 'aniweeb') aniweebView();
@@ -192,14 +201,16 @@ export default async function watch(ctx) {
     const drawPlayer = () => {
       completed = false; lastProgress = 0;
       const src = instantEmbed(id, ep, audio);
-      // This host may refuse sandboxed embeds; protection is optional and never weakens other players.
+      // Cross-origin player contents cannot be inspected; warn based on our own setting.
+      render(playerNotice, protectedMode ? html`<div class="player-sandbox-notice" role="status"><div><b>Instant Play may refuse popup protection</b><p>If the player says “Remove sandbox”, use the button to reload without protection. The provider may open ads, popups or redirects.</p></div><button type="button" class="btn sm" data-allow-instant>Turn off protection &amp; retry</button></div>` : html``);
+      $('[data-allow-instant]', playerNotice)?.addEventListener('click', () => { protectedMode = false; setSetting('instantPopupProtection', false); drawPlayer(); });
       mountEmbed(src, `${item.title} — ${epLabel}`, protectedMode);
       render(panel, html`<div class="instant-panel glass">
         <div><b>Instant play</b><p class="muted">Episode ${ep} · ${audio === 'sub' ? 'Subtitled' : 'Dubbed'}</p></div>
         <div class="seg" aria-label="Audio language"><button type="button" data-instant-audio="sub" class="${audio === 'sub' ? 'on' : ''}" aria-pressed="${audio === 'sub'}">Sub</button><button type="button" data-instant-audio="dub" class="${audio === 'dub' ? 'on' : ''}" aria-pressed="${audio === 'dub'}">Dub</button></div>
         <button type="button" class="btn sm" data-instant-retry>${icon('refresh')} Retry player</button>
         <button type="button" class="btn sm" data-instant-protect aria-pressed="${protectedMode}">${icon('shield')} Popup protection: ${protectedMode ? 'on' : 'off'}</button>
-        <p class="muted instant-help">Popup protection limits new tabs and top-level redirects, but this provider may refuse to play with it on. It cannot remove ads inside the player. Try Aniweeb or disable protection if playback fails. ${m.isAdult ? '' : html`<a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a>`}</p>
+        <p class="muted instant-help">Popup protection limits new tabs and top-level redirects but Instant Play may reject it. If you turn it off, the provider may open ads, popups or redirects. Try another server if playback fails. ${m.isAdult ? '' : html`<a href="${src}" target="_blank" rel="noopener noreferrer">Open player ${icon('ext')}</a>`}</p>
       </div>`);
     };
     drawPlayer();

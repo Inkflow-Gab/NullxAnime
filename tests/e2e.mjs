@@ -148,7 +148,7 @@ try {
     return await page.$eval('#update-notice', (el) => {
       const dialog = el.querySelector('[role="dialog"]'), button = el.querySelector('.update-ok');
       const bg = getComputedStyle(dialog).backgroundColor;
-      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('Your story, your journey') &&
+      return dialog.getAttribute('aria-modal') === 'true' && dialog.textContent.includes('A smoother way to watch') &&
         dialog.textContent.includes('Provider availability') && document.activeElement === button && bg.startsWith('rgba(22, 12, 48,');
     });
   })());
@@ -304,6 +304,19 @@ try {
     await page.$eval('[data-instant-protect]', (e) => e.click());
     return on && sandbox && !sandbox.includes('allow-popups') && !sandbox.includes('allow-top-navigation') && !(await page.$eval('#stage iframe', (f) => f.hasAttribute('sandbox')));
   })());
+  check('sandbox rejection has an explicit, warned retry without protection', await (async () => {
+    await page.$eval('[data-instant-protect]', (e) => e.click());
+    const warning = await page.$eval('#player-notice', (e) => e.textContent.includes('Remove sandbox') && e.textContent.includes('popups'));
+    await page.$eval('[data-allow-instant]', (e) => e.click());
+    const reset = await page.$eval('#stage iframe', (e) => !e.hasAttribute('sandbox') && e.src.endsWith('/1000/1/sub'));
+    const retained = await page.evaluate(async () => (await import('./js/store.js')).getSettings().instantPopupProtection === false);
+    return warning && reset && retained && !(await page.$('[data-allow-instant]'));
+  })());
+  check('TV playback help reports capabilities without promising provider support', await (async () => {
+    await page.$eval('#tv-playback-help summary', (e) => e.click());
+    await page.waitForFunction(() => document.querySelector('#tv-playback-capabilities').textContent.includes('H.264'));
+    return await page.$eval('#tv-playback-help', (e) => e.textContent.includes('cannot be guaranteed') && e.textContent.includes('does not test a particular stream'));
+  })());
   check('instant player ignores messages from other windows', await (async () => {
     await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', { origin: 'https://megaplay.buzz', source: window, data: { event: 'complete', currentTime: 60, duration: 60 } })));
     return !(await page.$eval('#markbtn', (e) => e.classList.contains('on')));
@@ -413,6 +426,55 @@ try {
   mockProviderEndpoints = false;
   check('watch → free library tab lists results', await (async () => { await page.click('[data-src="library"]'); await page.waitForSelector('.lib-item', { timeout: 6000 }); return true; })());
   check('watch → library item plays in custom player', await (async () => { await page.click('.lib-item'); await page.waitForSelector('.vp video', { timeout: 6000 }); return true; })());
+  check('built-in player plays and seeks real video with TV remote controls', await page.evaluate(async () => {
+    const { createPlayer } = await import('./js/player.js');
+    const html = document.documentElement, prior = html.dataset.tvMode; html.dataset.tvMode = 'on';
+    const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:10px;top:10px;width:320px;height:180px;z-index:999'; document.body.appendChild(host);
+    const player = createPlayer(host, { src: new URL('./tests/fixtures/movie_5.webm', location.href).href });
+    const video = player.video, root = host.querySelector('.vp'); video.muted = true;
+    const until = (event) => new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error(`Timed out waiting for ${event}`)), 6000); video.addEventListener(event, () => { clearTimeout(timer); resolve(); }, { once: true }); });
+    try {
+      if (video.readyState < 1) await until('loadedmetadata');
+      root.focus(); root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      if (video.paused) await until('playing');
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const started = !video.paused && video.currentTime > .05;
+      video.currentTime = 2;
+      if (video.seeking) await until('seeked');
+      const position = video.currentTime;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const continued = !video.paused && video.currentTime > position + .05;
+      const native = host.querySelector('.vp-native-toggle'); native.click();
+      const enabled = video.controls && native.getAttribute('aria-pressed') === 'true' && document.activeElement === video;
+      video.dispatchEvent(new KeyboardEvent('keydown', { key: 'BrowserBack', bubbles: true, cancelable: true }));
+      const disabled = !video.controls && native.getAttribute('aria-pressed') === 'false' && document.activeElement === root;
+      video.pause(); let calls = 0;
+      video.play = () => { calls++; return undefined; };
+      root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Unidentified', keyCode: 415, bubbles: true, cancelable: true }));
+      video.play = () => Promise.reject(new Error('blocked'));
+      root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const reported = host.querySelector('.vp-msg').textContent.includes('Playback could not start');
+      return started && continued && enabled && disabled && calls === 1 && reported;
+    } finally { player.destroy(); host.remove(); html.dataset.tvMode = prior; }
+  }));
+  check('TV directional navigation can reach both the built-in and embedded players', await page.evaluate(async () => {
+    const { createPlayer } = await import('./js/player.js');
+    const html = document.documentElement, prior = html.dataset.tvMode; html.dataset.tvMode = 'on';
+    const existing = [...document.body.children]; const visibility = existing.map((node) => node.style.visibility);
+    existing.forEach((node) => { node.style.visibility = 'hidden'; });
+    const wrap = document.createElement('div'); wrap.style.cssText = 'position:fixed;left:40px;top:40px;width:350px;height:320px;z-index:9999';
+    const button = document.createElement('button'); button.textContent = 'Above'; button.style.cssText = 'position:absolute;top:0;left:0;width:320px;height:40px'; wrap.appendChild(button);
+    const host = document.createElement('div'); host.style.cssText = 'position:absolute;top:70px;left:0;width:320px;height:180px'; wrap.appendChild(host); document.body.appendChild(wrap);
+    const player = createPlayer(host, { src: new URL('./tests/fixtures/movie_5.webm', location.href).href });
+    try {
+      button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+      const builtIn = document.activeElement === host.querySelector('.vp');
+      player.destroy(); host.innerHTML = '<iframe title="Embedded episode player" src="about:blank" style="width:320px;height:180px"></iframe>';
+      button.focus(); button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+      return builtIn && document.activeElement === host.querySelector('iframe');
+    } finally { wrap.remove(); existing.forEach((node, i) => { node.style.visibility = visibility[i]; }); html.dataset.tvMode = prior; }
+  }));
   check('player shortcuts do not steal arrows from other controls', await page.evaluate(() => {
     const range = document.querySelector('.vp-range'), mark = document.querySelector('#markbtn');
     const event = () => new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
